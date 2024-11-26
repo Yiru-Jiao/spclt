@@ -209,7 +209,7 @@ def assign_soft_labels(sim_mat, tau_inst):
 class custom_dataset(Dataset):
     def __init__(self, X, loader):
         self.X = X
-        if loader == 'MacroTraffic':
+        if 'Macro' in loader:
             self.X = self.X[:, :-15, :, :]
 
     def __len__(self):

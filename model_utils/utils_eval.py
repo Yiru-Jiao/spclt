@@ -4,6 +4,7 @@ This script includes utility functions for evaluation of the models.
 
 import os
 import sys
+from tqdm import tqdm
 import numpy as np
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.measures import MeasureCalculator
@@ -23,7 +24,7 @@ class Multi_Evaluation:
         k_neighbours = np.unique(np.logspace(1, np.log(min(dist_mat_X.shape[0]/3,200))/np.log(5), num=10, base=5).astype(int))
         return k_neighbours
 
-    def get_multi_evals(self, local=False, drmse_only=False):
+    def get_multi_evals(self, local=False, drmse_only=False, verbose=False):
         """
         Performs multiple evaluations for nonlinear dimensionality
         reduction.
@@ -44,7 +45,11 @@ class Multi_Evaluation:
             sample_indices = np.arange(self.data.shape[0])
             sample_count = 0
             dist_mat_measure = {'local_distmat_rmse': 0}
-            for sample_index in sample_indices:
+            if verbose:
+                progress_bar = tqdm(sample_indices, desc='Local Evaluation', ascii=True, miniters=5)
+            else:
+                progress_bar = sample_indices
+            for sample_index in progress_bar:
                 data = self.data[sample_index].reshape(N, -1)
                 dist_mat_X = get_EUC(data)
                 latent = self.latent[sample_index].reshape(N, -1)
@@ -117,7 +122,11 @@ def evaluate(loader, dataset, data, labels, model, batch_size, local=False, drms
         data = data.transpose(0, 2, 1, 3)
 
     evaluator = Multi_Evaluation(loader, dataset, data, latent)
-    ev_result = evaluator.get_multi_evals(local, drmse_only)
+    if dataset in ['EigenWorms', 'MotorImagery']:
+        verbose = True
+    else:
+        verbose = False
+    ev_result = evaluator.get_multi_evals(local, drmse_only, verbose)
 
     return ev_result
 
