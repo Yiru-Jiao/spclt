@@ -61,6 +61,7 @@ class DGCN(nn.Module):
         with torch.no_grad():
             output = []
             for x, _ in dataloader:
+                x = x[:,:-self.T]
                 x = x.to(device)
                 out = self.encoder(x) # (B, n_node=193, dim_feature/2=64)
                 output.append(out)
@@ -140,6 +141,7 @@ class LSTM(nn.Module):
             output = []
             for x, _ in dataloader:
                 # Reshape input from (B, seq_len, nb_node, dim_feature) to (B, seq_len, nb_node*dim_feature)
+                x = x[:,:-self.T]
                 x = x.view(x.size(0), x.size(1), -1).to(device)
 
                 # Initialize hidden and cell states
@@ -214,6 +216,7 @@ class GRU(nn.Module):
             output = []
             for x, _ in dataloader:
                 # Reshape input from (B, seq_len, nb_node, dim_feature) to (B, seq_len, nb_node*dim_feature)
+                x = x[:,:-self.T]
                 x = x.view(x.size(0), x.size(1), -1).to(device)
 
                 # Initialize hidden states for the encoder
