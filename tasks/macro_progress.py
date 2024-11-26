@@ -137,7 +137,10 @@ def main(args):
         else:
             optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
 
-        scheduler = StepLR(optimizer, step_size=10, gamma=0.8)
+        if model_type == 'original':
+            scheduler = StepLR(optimizer, step_size=1, gamma=0.98)
+        else:
+            scheduler = StepLR(optimizer, step_size=10, gamma=0.8)
         validation_loader = DataLoader(validationset, batch_size=BATCH_SIZE, shuffle=False)
 
         # Train model if not already trained
