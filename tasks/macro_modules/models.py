@@ -7,8 +7,8 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class custom_encode_dataset(Dataset): 
-    def __init__(self, X, T=15):
-        self.X = X[:, :-T, :, :]
+    def __init__(self, X):
+        self.X = X[:, :20, :, :] # Make sure only the first 20 time steps are used
 
     def __len__(self): 
         return len(self.X)
@@ -38,7 +38,8 @@ class DGCN(nn.Module):
         self.decoder = Decoder(self.N, self.F, self.A, self.B, self.T, self.uncertainty)
 
     def forward(self, x, thred):
-        h = self.encoder(x[:,:-self.T])
+        assert x.size(1) == 35
+        h = self.encoder(x[:,:20]) # Make sure only the first 20 time steps are used
         prediction, mask1, mask2, demand = self.decoder(x[:,-self.T:], h, thred)
 
         if self.interpret:
@@ -52,16 +53,15 @@ class DGCN(nn.Module):
             batch_size = 16
 
         if isinstance(data, torch.Tensor):
-            dataset = custom_encode_dataset(data, self.T)
+            dataset = custom_encode_dataset(data)
         else:
-            dataset = custom_encode_dataset(torch.from_numpy(data).float(), self.T)
+            dataset = custom_encode_dataset(torch.from_numpy(data).float())
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)        
 
         device = next(self.encoder.parameters()).device
         with torch.no_grad():
             output = []
             for x, _ in dataloader:
-                x = x[:,:-self.T]
                 x = x.to(device)
                 out = self.encoder(x) # (B, n_node=193, dim_feature/2=64)
                 output.append(out)
@@ -91,7 +91,7 @@ class LSTM(nn.Module):
         self.T = para['horizon']
         self.input_dim = para['nb_node']*2
         self.hidden_dim = para['nb_node']*4
-        self.output_dim = para['nb_node']*2
+        self.output_dim = para['nb_node']*2 
         self.num_layers = num_layers
 
         if encoder is None:
@@ -106,7 +106,8 @@ class LSTM(nn.Module):
 
     def forward(self, x, thred):
         # Reshape input from (B, seq_len, nb_node, 2) to (B, seq_len, nb_node*2)
-        x = x[:,:-self.T]
+        x = x[:,:20] # Make sure only the first 20 time steps are used
+        assert x.size(1) == 20
         x = x.view(x.size(0), x.size(1), -1)
 
         # Initialize hidden and cell states
@@ -131,9 +132,9 @@ class LSTM(nn.Module):
             batch_size = 64
 
         if isinstance(data, torch.Tensor):
-            dataset = custom_encode_dataset(data, self.T)
+            dataset = custom_encode_dataset(data)
         else:
-            dataset = custom_encode_dataset(torch.from_numpy(data).float(), self.T)
+            dataset = custom_encode_dataset(torch.from_numpy(data).float())
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)        
 
         device = next(self.encoder.parameters()).device
@@ -141,7 +142,6 @@ class LSTM(nn.Module):
             output = []
             for x, _ in dataloader:
                 # Reshape input from (B, seq_len, nb_node, dim_feature) to (B, seq_len, nb_node*dim_feature)
-                x = x[:,:-self.T]
                 x = x.view(x.size(0), x.size(1), -1).to(device)
 
                 # Initialize hidden and cell states
@@ -181,7 +181,8 @@ class GRU(nn.Module):
 
     def forward(self, x, thred):
         # Reshape input from (B, seq_len, nb_node, 2) to (B, seq_len, nb_node*2)
-        x = x[:,:-self.T]
+        x = x[:,:20] # Make sure only the first 20 time steps are used
+        assert x.size(1) == 20
         x = x.view(x.size(0), x.size(1), -1)
 
         # Initialize hidden and cell states
@@ -206,9 +207,9 @@ class GRU(nn.Module):
             batch_size = 64
 
         if isinstance(data, torch.Tensor):
-            dataset = custom_encode_dataset(data, self.T)
+            dataset = custom_encode_dataset(data)
         else:
-            dataset = custom_encode_dataset(torch.from_numpy(data).float(), self.T)
+            dataset = custom_encode_dataset(torch.from_numpy(data).float())
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)        
 
         device = next(self.encoder.parameters()).device
@@ -216,7 +217,6 @@ class GRU(nn.Module):
             output = []
             for x, _ in dataloader:
                 # Reshape input from (B, seq_len, nb_node, dim_feature) to (B, seq_len, nb_node*dim_feature)
-                x = x[:,:-self.T]
                 x = x.view(x.size(0), x.size(1), -1).to(device)
 
                 # Initialize hidden states for the encoder

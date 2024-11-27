@@ -16,7 +16,7 @@ def train_one_epoch(model, optimizer, loss_func, training_loader, beta, count, T
     for j, data in enumerate(training_loader):
         x = data
         optimizer.zero_grad()
-        p = model(x[:,:-T], math.exp(beta*count))
+        p = model(x, math.exp(beta*count))
         loss = loss_func(p, x[:,-T:])
         loss.backward()
         optimizer.step()
