@@ -23,12 +23,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--loader', type=str, required=True, help='The data loader used to load the experimental data. This can be set to UCR, UEA, INT')
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
-    parser.add_argument('--reverse_list', type=int, default=0, help='Whether to reverse the dataset list (defaults to 0)')
-    parser.add_argument('--doublecheck', type=int, default=0, help='Whether to double check the training results (defaults to 0)')
     args = parser.parse_args()
-    args.reverse_list = bool(args.reverse_list)
-    args.doublecheck = bool(args.doublecheck)
-
+    
     # Set default parameters
     args.sliding_padding = 0
     args.repr_dims = 320
@@ -50,6 +46,14 @@ def main(args):
     initial_time = systime.time()
     print('Available cpus:', torch.get_num_threads(), 'available gpus:', torch.cuda.device_count())
     
+    # Set the random seed
+    if args.reproduction:
+        args.seed = 131 # Fix the random seed for reproduction
+    if args.seed is None:
+        args.seed = random.randint(0, 1000)
+    print(f"Random seed is set to {args.seed}")
+    fix_seed(args.seed, deterministic=args.reproduction)
+
     # Initialize the deep learning program
     print(f'--- Cuda available: {torch.cuda.is_available()} ---')
     if torch.cuda.is_available(): 
@@ -94,8 +98,10 @@ def main(args):
         eval_results.to_csv(results_dir)
 
     # Train for each dataset
-    if args.reverse_list:
-        dataset_list = dataset_list[::-1]
+    bad_datasets = ['DuckDuckGeese',
+                    'EigenWorms',
+                    'MotorImagery',
+                    'PEMS-SF'] # Datasets that are too resource-consuming to compute DTW or TAM
     for dataset in dataset_list:
         # Load dataset
         if args.loader == 'UEA':
@@ -120,7 +126,11 @@ def main(args):
 
         # Compute similarity matrix
         if args.loader == 'UEA':
-            args.dist_metric = 'DTW'
+            if dataset in bad_datasets:
+                print(f"Dataset {dataset} is too resource-consuming to compute DTW or TAM, switch to EUC by default.")
+                args.dist_metric = 'EUC'
+            else:
+                args.dist_metric = 'DTW'
         else:
             args.dist_metric = 'EUC'
         sim_mat = datautils.get_sim_mat(args.loader, train_data, dataset, args.dist_metric)
@@ -142,17 +152,15 @@ def main(args):
 
         # Iterate over different losses
         for model_type in model_list:
-            # Adjust epochs for slow convergence models
-            if 'ggeo' in model_type:
-                if dataset in ['EigenWorms']:
-                    args.epochs = 199
-                    verbose = 2
-                elif dataset in ['MotorImagery']:
-                    args.epochs = 399
-                    verbose = 2
-            # Skip if in the double check mode and the combination of (dataset, model) has not been trained
-            if args.doublecheck and ((model_type, dataset) not in trained_datasets_models):
-                continue
+            if args.loader == 'UEA':
+                if eval_results.loc[(model_type, dataset), 'global_mean_continuity'] > 0:
+                    final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
+                    if final_epoch[-2:] != '00':
+                        print(f'--- {model_type} {dataset} has been evaluated (not 00), skipping evaluation ---')
+                        continue
+                    elif int(final_epoch) == args.epochs:
+                        print(f'--- {model_type} {dataset} has been trained (==epochs), skipping evaluation ---')
+                        continue
             # Set hyperparameters and configure model
             try:
                 args = load_tuned_hyperparameters(args, tuned_params, model_type)
@@ -170,9 +178,7 @@ def main(args):
                 eval_results = read_saved_results()
                 training_time = eval_results.loc[(model_type, dataset), 'training_time']
                 training_epochs = eval_results.loc[(model_type, dataset), 'training_epochs']
-                final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
-
-            if loss_log_exist and (training_time > 0) and final_epoch[-2:] != '00':
+            if loss_log_exist and (training_time > 0):
                 print(f'--- {model_type} {dataset} has been trained, skip training ---')
             else:
                 # Create model

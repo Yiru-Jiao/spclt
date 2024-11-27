@@ -197,36 +197,41 @@ class spclt():
             if self.loader == 'UEA':
                 factor = 0.6
                 if train_data.shape[0]<5000:
-                    patience = 5
-                    cool_down = 25
+                    patience = 4
+                    cool_down_weight = 50
+                    cool_down_model = int(cool_down_model/2)
                     self.initial_cooldown = 0
                 else:
-                    patience = 4
-                    cool_down = 15
+                    patience = 3
+                    cool_down_weight = 25
+                    cool_down_model = int(cool_down_model/2)
                     self.initial_cooldown = 0
             else:
                 factor = 0.4
                 if self.loader == 'MacroTraffic':
                     patience = 4
-                    cool_down = 6
+                    cool_down_weight = 6
+                    cool_down_model = 6
                     self.initial_cooldown = 10
                 elif self.loader == 'MicroTraffic':
                     patience = 3
-                    cool_down = 2
+                    cool_down_weight = 2
+                    cool_down_model = 2
                     self.initial_cooldown = 4
                 elif self.loader in ['MacroLSTM', 'MacroGRU']:
                     patience = 4
-                    cool_down = 6
+                    cool_down_weight = 6
+                    cool_down_model = 6
                     self.initial_cooldown = 8
 
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                self.optimizer, mode='min', factor=factor, patience=patience, cooldown=cool_down,
+                self.optimizer, mode='min', factor=factor, patience=patience, cooldown=cool_down_model,
                 threshold=1e-3, threshold_mode='rel', min_lr=self.lr*factor**15
                 )
             
             if self.regularizer_config['reserve'] is not None:
                 self.scheduler_weight = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    self.optimizer_weight, mode='min', factor=factor, patience=patience, cooldown=cool_down,
+                    self.optimizer_weight, mode='min', factor=factor, patience=patience, cooldown=cool_down_weight,
                     threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*factor**15
                     )
                 def scheduler_update(val_loss_log, val_batch_iter, val_loss):
