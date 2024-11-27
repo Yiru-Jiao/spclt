@@ -24,17 +24,20 @@ def fit_svm(features, y, MAX_SAMPLES=10000): # reuse from the softclt repo
                     0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000
                 ],
                 'kernel': ['rbf'],
+                'degree': [3],
                 'gamma': ['scale', 'auto'],
+                'coef0': [0],
                 'shrinking': [True],
                 'probability': [False],
                 'tol': [0.001],
-                'cache_size': [400],
+                'cache_size': [200],
                 'class_weight': ['balanced'],
-                'max_iter': [-1],
+                'max_iter': [10000000],
                 'decision_function_shape': ['ovr'],
                 'random_state': [131]
             },
-            cv=3, n_jobs=-1
+            cv=5, n_jobs=-1
+
         )
         # If the training set is too large, subsample MAX_SAMPLES examples
         if train_size > MAX_SAMPLES:
