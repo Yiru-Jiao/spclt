@@ -114,6 +114,11 @@ def main(args):
         feature_size = test_data.shape[-1]
         # Iterate over different models
         for model_type in model_list:
+            # Skip if the model has been evaluated
+            if eval_results.loc[(model_type, dataset), 'svm_acc'] > 0:
+                print(f'--- {model_type} {dataset} has been evaluated, skipping ---')
+                continue
+
             model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
             os.makedirs(model_dir, exist_ok=True)
 
