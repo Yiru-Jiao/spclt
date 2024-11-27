@@ -39,7 +39,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
         running_vloss = 0.0
         for i, vdata in enumerate(validation_loader):
             x = vdata
-            p = model(x[:,:-T], 0)
+            p = model(x, 0)
             v_loss = loss_func(p, x[:,-T:])
             running_vloss += float(v_loss)
 
@@ -87,7 +87,7 @@ def test_run_point(testset, model, BATCH_SIZE):
 
     # for x in tqdm(testloader, desc='TEST', total=len_test, ascii=True, miniters=int(len_test/5)):
     for x in testloader:
-        p = model(x[:,:-15], 0) # horizon = 15
+        p = model(x, 0)
 
         gc.disable()
         prediction.append(np.array(p.detach().to('cpu'))[...,-3:]) 
