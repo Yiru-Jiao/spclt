@@ -102,11 +102,11 @@ def main(args):
         eval_results = eval_results.set_index(['model', 'epoch'])
         return eval_results
 
+    pred_metrics = ['mae', 'rmse', 'error_std', 'explained_variance'] # Prediction-based
+    knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
     if os.path.exists(results_dir):
         eval_results = read_saved_results()
     else:
-        pred_metrics = ['mae', 'rmse', 'error_std', 'explained_variance'] # Prediction-based
-        knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
         eval_results = pd.DataFrame(np.zeros((len(model_list)*int(EPOCH_NUMBER/6), 4), dtype=np.float32), columns=pred_metrics,
                                     index=pd.MultiIndex.from_product([model_list, list(range(int(EPOCH_NUMBER/6)))], names=['model', 'epoch']))
         eval_results.to_csv(results_dir)
@@ -134,12 +134,9 @@ def main(args):
 
         if args.prediction_model == 'DGCN':
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        else:
-            optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
-
-        if model_type == 'original':
             scheduler = StepLR(optimizer, step_size=1, gamma=0.98)
         else:
+            optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
             scheduler = StepLR(optimizer, step_size=10, gamma=0.8)
         validation_loader = DataLoader(validationset, batch_size=BATCH_SIZE, shuffle=False)
 
@@ -157,19 +154,17 @@ def main(args):
             print(f'Training time for {model_type}: ' + systime.strftime('%H:%M:%S', systime.gmtime(finetuning_time)))
 
         # Evaluate models
-        if model_type in eval_results.index.levels[0]:
-            if eval_results.loc[(model_type, int(EPOCH_NUMBER/6-1)), 'mae'] > 0:
-                print(f'--- {model_type} has been evaluated, skipping evaluation ---')
-                continue
-
         ## Load standardized data for structure similarity evaluation
         _, _, test_data = load_MacroTraffic(years, para['time_invertal'], para['horizon'], para['observation'],
                                             dataset_dir='./datasets')
         progress_list = glob(os.path.join(save_dir+model_type, 'ckpt_*.pth'))
         progress_list = sorted(progress_list, key=lambda x: int(x.split('ckpt_')[1].split('.pth')[0]))
-        epoch_indecies = [int(epoch_path.split('ckpt_')[1].split('.pth')[0]) for epoch_path in progress_list]
         initial_file_saved_time = os.path.getmtime(progress_list[0])
-        for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, miniters=20, total=len(progress_list)):
+        epoch_indecies = [int(epoch_path.split('ckpt_')[1].split('.pth')[0]) for epoch_path in progress_list]
+        for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, miniters=10, total=len(progress_list)):
+            if eval_results.loc[(model_type, epoch_index), 'mae'] > 0 and args.prediction_model != 'DGCN':
+                print(f'--- {model_type}-{epoch_index} has been evaluated, skipping evaluation ---')
+                continue
             model.load_state_dict(torch.load(epoch_path, map_location=device, weights_only=True))
             model = model.to(device)
             model.eval()
@@ -191,10 +186,32 @@ def main(args):
                          'labels': test_labels,
                          'model': model,
                          'batch_size': 128}
-            global_dist_results = evaluate(local=False, drmse_only=False, **eval_args)
-            # global_dist_results = evaluate(local=False, drmse_only=True, **eval_args)
-
-            key_values = {**pred_results, **global_dist_results}
+            global_eval_exist = 'global_mean_dist_mrre' in eval_results.columns
+            if global_eval_exist:
+                global_evaluated = eval_results.loc[(model_type, epoch_index), 'global_mean_dist_mrre'] > 0
+            else:
+                global_evaluated = False
+            if global_eval_exist and global_evaluated:
+                global_dist_results = {}
+                for metric in knn_metrics:
+                    global_dist_results[f'global_{metric}'] = eval_results.loc[(model_type, epoch_index), f'global_{metric}']
+            else:
+                global_dist_results = evaluate(local=False, drmse_only=False, **eval_args)
+            if args.prediction_model == 'DGCN':
+                local_eval_exist = 'local_mean_dist_mrre' in eval_results.columns
+                if local_eval_exist:
+                    local_evaluated = eval_results.loc[(model_type, epoch_index), 'local_mean_dist_mrre'] > 0
+                else:
+                    local_evaluated = False
+                if local_eval_exist and local_evaluated:
+                    local_dist_results = {}
+                    for metric in knn_metrics:
+                        local_dist_results[f'local_{metric}'] = eval_results.loc[(model_type, epoch_index), f'local_{metric}']
+                else:
+                    local_dist_results = evaluate(local=True, drmse_only=False, **eval_args)
+                key_values = {**pred_results, **local_dist_results, **global_dist_results}
+            else:
+                key_values = {**pred_results, **global_dist_results}
             keys = list(key_values.keys())
             values = np.array(list(key_values.values())).astype(np.float32)
             eval_results = read_saved_results() # read saved results again to avoid overwriting
