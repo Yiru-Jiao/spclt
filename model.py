@@ -199,12 +199,12 @@ class spclt():
                 if train_data.shape[0]<5000:
                     patience = 4
                     cool_down_weight = 50
-                    cool_down_model = int(cool_down_model/2)
+                    cool_down_model = int(cool_down_weight/2)
                     self.initial_cooldown = 0
                 else:
                     patience = 3
                     cool_down_weight = 25
-                    cool_down_model = int(cool_down_model/2)
+                    cool_down_model = int(cool_down_weight/2)
                     self.initial_cooldown = 0
             else:
                 factor = 0.4
