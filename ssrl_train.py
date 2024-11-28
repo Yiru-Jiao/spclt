@@ -3,7 +3,6 @@ This script is used to train and evaluate models.
 Tuned hyperparameters are loaded from the hyper_parameters directory.
 The trained models are saved in the results directory.
 The evaluation results are saved in the evaluation directory.
-Random seed is not fixed during ssrl training, but will be fixed during downstream tasks.
 '''
 
 import os
@@ -23,8 +22,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--loader', type=str, required=True, help='The data loader used to load the experimental data. This can be set to UCR, UEA, INT')
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
+    parser.add_argument('--seed', type=int, default=None, help='The random seed')
+    parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
     args = parser.parse_args()
-    
+    args.reproduction = bool(args.reproduction)
+
     # Set default parameters
     args.sliding_padding = 0
     args.repr_dims = 320
@@ -90,7 +92,6 @@ def main(args):
     
     if os.path.exists(results_dir):
         eval_results = read_saved_results()
-        trained_datasets_models = eval_results[eval_results['training_time']>0].index.tolist()
     else:
         metrics = ['training_time', 'training_epochs', 'training_time_per_epoch']
         eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list), 3), dtype=np.float32), columns=metrics,
@@ -153,7 +154,7 @@ def main(args):
         # Iterate over different losses
         for model_type in model_list:
             if args.loader == 'UEA':
-                if eval_results.loc[(model_type, dataset), 'global_mean_continuity'] > 0:
+                if eval_results.loc[(model_type, dataset), 'training_time'] > 0:
                     final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
                     if final_epoch[-2:] != '00':
                         print(f'--- {model_type} {dataset} has been evaluated (not 00), skipping evaluation ---')

@@ -40,9 +40,6 @@ import pandas as pd
 import argparse
 from model_utils.utils_paramsearch import *
 import model_utils.utils_data as datautils
-'''
-The random seed should not be fixed as training uses random masking and cropping.
-'''
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -50,9 +47,10 @@ def parse_args():
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
     parser.add_argument('--n_fold', type=int, default=0, help='The number of folds for cross-validation (defaults to 0 for no cross-validation)')
     parser.add_argument('--n_jobs', type=int, default=-1, help='The number of parallel jobs to run for grid search (defaults to -1 for all available cores)')
-    parser.add_argument('--reverse_list', type=int, default=0, help='Whether to reverse the dataset list (defaults to 0)')
+    parser.add_argument('--seed', type=int, default=None, help='The random seed')
+    parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
     args = parser.parse_args()
-    args.reverse_list = bool(args.reverse_list)
+    args.reproduction = bool(args.reproduction)
     return args
 
 
@@ -60,6 +58,14 @@ def main(args):
     initial_time = systime.time()
     print('Available cpus:', torch.get_num_threads(), 'available gpus:', torch.cuda.device_count())
     
+    # Set the random seed
+    if args.reproduction:
+        args.seed = 131 # Fix the random seed for reproduction
+    if args.seed is None:
+        args.seed = random.randint(0, 1000)
+    print(f"Random seed is set to {args.seed}")
+    fix_seed(args.seed, deterministic=args.reproduction)
+
     # Initialize the deep learning program, `init_dl_program` is defined in `utils_general.py`
     print(f'--- Cuda available: {torch.cuda.is_available()} ---')
     if torch.cuda.is_available(): 
@@ -115,8 +121,6 @@ def main(args):
         raise ValueError(f"Unknown dataset loader: {args.loader}")
 
     # Search for each dataset
-    if args.reverse_list:
-        dataset_list = dataset_list[::-1]
     for dataset in dataset_list:
         start_time = systime.time()
 
