@@ -6,6 +6,7 @@ datasets/**/*.md
 !**/*.py
 datasets/**/*.py
 !**/*.ipynb
+test.ipynb
 results
 # !results/**/*.csv
 # !results/**/*.pth
