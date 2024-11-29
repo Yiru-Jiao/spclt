@@ -54,14 +54,11 @@ def main(args):
     print(f'--- Device: {device}, Pytorch version: {torch.__version__} ---')
 
     # Create the directory to save the evaluation results
-    continued_results_dir = './results/evaluation/MicroTraffic_continued_evaluation.csv'
-    continued_save_dir = './results/finetune/MicroTraffic_continued/'
-    fixed_results_dir = './results/evaluation/MicroTraffic_fixed_evaluation.csv'
-    fixed_save_dir = './results/finetune/MicroTraffic_fixed/'
+    results_dir = './results/evaluation/MicroTraffic_continued_evaluation.csv'
+    save_dir = './results/finetune/MicroTraffic_continued/'
     # Make sure the directories exist
-    for save_dir in [continued_save_dir, fixed_save_dir]:
-        os.makedirs(save_dir, exist_ok=True)
-    print(os.path.exists(os.path.dirname(continued_results_dir)), os.path.exists(os.path.dirname(fixed_results_dir)))
+    os.makedirs(save_dir, exist_ok=True)
+    print(os.path.exists(os.path.dirname(results_dir)))
 
     # Define hyper parameters
     paralist = utils_pre.config_micro()
@@ -79,112 +76,101 @@ def main(args):
     pred_metrics = ['min_fde', 'mr_05', 'mr_1', 'mr_2']
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
 
-    for continue_training, results_dir, save_dir in zip([False, True], [fixed_results_dir, continued_results_dir], [fixed_save_dir, continued_save_dir]):
-        if not continue_training:
-            continue
-        def read_saved_results():
-            eval_results = pd.read_csv(results_dir)
-            eval_results['dataset'] = eval_results['dataset'].astype(str)
-            eval_results = eval_results.set_index(['model', 'dataset'])
-            return eval_results
-        
-        if os.path.exists(results_dir):
-            eval_results = read_saved_results()
+    def read_saved_results():
+        eval_results = pd.read_csv(results_dir)
+        eval_results['dataset'] = eval_results['dataset'].astype(str)
+        eval_results = eval_results.set_index(['model', 'dataset'])
+        return eval_results
+    
+    if os.path.exists(results_dir):
+        eval_results = read_saved_results()
+    else:
+        metrics = pred_metrics + ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
+        eval_results = pd.DataFrame(np.zeros((len(model_list), 12), dtype=np.float32), columns=metrics,
+                                    index=pd.MultiIndex.from_product([model_list,train_set], names=['model','dataset']))
+        eval_results.to_csv(results_dir)
+
+    # Load the dataset
+    trainset = InteractionDataset(train_set, 'train', paralist, paralist['mode'], device)
+    validationset = InteractionDataset(['val'], 'val', paralist, paralist['mode'], device)
+    validation_loader = DataLoader(validationset, batch_size=paralist['batch_size'], shuffle=False)
+    testset = InteractionDataset(['test'], 'test', paralist, paralist['mode'], device)
+
+    for model_type in model_list:
+        # Define model
+        paralist['resolution'] = 1.
+        paralist['inference'] = False
+
+        if model_type == 'original':
+            model = UQnet(paralist, test=False, drivable=False).to(device)
         else:
-            metrics = pred_metrics + ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
-            eval_results = pd.DataFrame(np.zeros((len(model_list), 12), dtype=np.float32), columns=metrics,
-                                        index=pd.MultiIndex.from_product([model_list,train_set], names=['model','dataset']))
-            eval_results.to_csv(results_dir)
+            model_dir = f'./results/pretrain/MicroTraffic/{model_type}/train1'
+            sp_encoder = utils_pre.define_encoder('MicroTraffic', device, model_dir=model_dir)
+            model = UQnet(paralist, test=False, drivable=False, traj_encoder=sp_encoder).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        scheduler_heatmap = StepLR(optimizer, step_size=1, gamma=0.975)
+        scheduler_epoch = ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=3, cooldown=2,
+                                            threshold=1e-3, threshold_mode='rel', min_lr=0.001*0.6**10)
 
-        # Load the dataset
-        trainset = InteractionDataset(train_set, 'train', paralist, paralist['mode'], device)
-        validationset = InteractionDataset(['val'], 'val', paralist, paralist['mode'], device)
-        validation_loader = DataLoader(validationset, batch_size=paralist['batch_size'], shuffle=False)
-        testset = InteractionDataset(['test'], 'test', paralist, paralist['mode'], device)
+        # Train model if not already trained
+        if os.path.exists(os.path.join(save_dir, f'decoder_{model_type}.pth')):
+            print(f'--- {model_type} has been trained ---')
+        else:
+            print(f'--- Training {model_type} ---')
+            start_time = systime.time()
+            train_model(paralist['epochs'], paralist['batch_size'], trainset, model, 
+                        optimizer, validation_loader, OverAllLoss(paralist).to(device),
+                        scheduler_heatmap, scheduler_epoch, mode=paralist['mode'])
+            finetuning_time = systime.time() - start_time
+            torch.save(model.encoder.state_dict(), os.path.join(save_dir, f'encoder_{model_type}.pth'))
+            torch.save(model.decoder.state_dict(), os.path.join(save_dir, f'decoder_{model_type}.pth'))
+            print(f'Training time for {model_type}: ' + systime.strftime('%H:%M:%S', systime.gmtime(finetuning_time)))
 
-        for model_type in model_list:
-            # Define model
-            paralist['resolution'] = 1.
-            paralist['inference'] = False
+        # Evaluate models
+        if eval_results.loc[(model_type, dataset), 'global_mean_continuity'] > 0:
+            print(f'--- {model_type} {dataset} has been evaluated, skipping evaluation ---')
+            continue
 
-            if model_type == 'original':
-                model = UQnet(paralist, test=False, drivable=False).to(device)
-            else:
-                model_dir = f'./results/pretrain/MicroTraffic/{model_type}/train1'
-                sp_encoder = utils_pre.define_encoder('MicroTraffic', device, model_dir=model_dir,
-                                                      continue_training=continue_training)
-                model = UQnet(paralist, test=False, drivable=False, traj_encoder=sp_encoder).to(device)
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-            scheduler_heatmap = StepLR(optimizer, step_size=1, gamma=0.975)
-            scheduler_epoch = ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=3, cooldown=2,
-                                                threshold=1e-3, threshold_mode='rel', min_lr=0.001*0.6**10)
+        paralist['resolution'] = 0.5
+        paralist['inference'] = True
+        if model_type == 'original':
+            model = UQnet(paralist, test=True, drivable=False) # set test=True here
+        else:
+            sp_encoder = utils_pre.define_encoder('MicroTraffic', device, model_dir=model_dir)
+            model = UQnet(paralist, test=True, drivable=False, traj_encoder=sp_encoder)
 
-            # Train model if not already trained
-            if os.path.exists(os.path.join(save_dir, f'decoder_{model_type}.pth')):
-                print(f'--- {model_type} has been trained ---')
-            else:
-                print(f'--- Training {model_type} ---')
-                start_time = systime.time()
-                train_model(paralist['epochs'], paralist['batch_size'], trainset, model, 
-                            optimizer, validation_loader, OverAllLoss(paralist).to(device),
-                            scheduler_heatmap, scheduler_epoch, mode=paralist['mode'])
-                finetuning_time = systime.time() - start_time
-                if model_type == 'original':
-                    torch.save(model.encoder.state_dict(), os.path.join(fixed_save_dir, f'encoder_{model_type}.pth'))
-                    torch.save(model.decoder.state_dict(), os.path.join(fixed_save_dir, f'decoder_{model_type}.pth'))
-                    torch.save(model.encoder.state_dict(), os.path.join(continued_save_dir, f'encoder_{model_type}.pth'))
-                    torch.save(model.decoder.state_dict(), os.path.join(continued_save_dir, f'decoder_{model_type}.pth'))
-                else:
-                    torch.save(model.encoder.state_dict(), os.path.join(save_dir, f'encoder_{model_type}.pth'))
-                    torch.save(model.decoder.state_dict(), os.path.join(save_dir, f'decoder_{model_type}.pth'))
-                print(f'Training time for {model_type}: ' + systime.strftime('%H:%M:%S', systime.gmtime(finetuning_time)))
+        model.encoder.load_state_dict(torch.load(os.path.join(save_dir, f'encoder_{model_type}.pth'), 
+                                                    map_location=device, weights_only=True))
+        model.decoder.load_state_dict(torch.load(os.path.join(save_dir, f'decoder_{model_type}.pth'), 
+                                                    map_location=device, weights_only=True))
+        model = model.to(device)
+        model.eval()
+        Yp, Ua, Ue, Y = inference_model([model], testset, paralist)
 
-            # Evaluate models
-            if eval_results.loc[(model_type, dataset), 'global_mean_continuity'] > 0:
-                print(f'--- {model_type} {dataset} has been evaluated, skipping evaluation ---')
-                continue
+        # Prediction evaluation
+        min_fde, mr_list = ComputeError(Yp, Y, r_list=[0.5,1.,2.], sh=6) # r is the radius of error in meters
+        pred_results = {'min_fde': min_fde, 'mr_05': mr_list[0], 'mr_1': mr_list[1], 'mr_2': mr_list[2]}
 
-            paralist['resolution'] = 0.5
-            paralist['inference'] = True
-            if model_type == 'original':
-                model = UQnet(paralist, test=True, drivable=False) # set test=True here
-            else:
-                sp_encoder = utils_pre.define_encoder('MicroTraffic', device, model_dir=model_dir,
-                                                      continue_training=continue_training)
-                model = UQnet(paralist, test=True, drivable=False, traj_encoder=sp_encoder)
+        # Encoding evaluation
+        _, _, test_data = load_MicroTraffic(train_set, dataset_dir='./datasets')
+        test_labels = np.zeros(test_data.shape[0])
+        eval_args = {'loader': 'MicroTraffic',
+                     'dataset': dataset,
+                     'data': test_data,
+                     'labels': test_labels,
+                     'model': model,
+                     'batch_size': 128}
+        local_dist_results = evaluate(local=True, **eval_args)
+        global_dist_results = evaluate(local=False, **eval_args)
 
-            model.encoder.load_state_dict(torch.load(os.path.join(save_dir, f'encoder_{model_type}.pth'), 
-                                                     map_location=device, weights_only=True))
-            model.decoder.load_state_dict(torch.load(os.path.join(save_dir, f'decoder_{model_type}.pth'), 
-                                                     map_location=device, weights_only=True))
-            model = model.to(device)
-            model.eval()
-            Yp, Ua, Ue, Y = inference_model([model], testset, paralist)
+        key_values = {**pred_results, **local_dist_results, **global_dist_results}
+        keys = list(key_values.keys())
+        values = np.array(list(key_values.values())).astype(np.float32)
+        eval_results = read_saved_results() # read saved results again to avoid overwriting
+        eval_results.loc[(model_type, dataset), keys] = values
 
-            # Prediction evaluation
-            min_fde, mr_list = ComputeError(Yp, Y, r_list=[0.5,1.,2.], sh=6) # r is the radius of error in meters
-            pred_results = {'min_fde': min_fde, 'mr_05': mr_list[0], 'mr_1': mr_list[1], 'mr_2': mr_list[2]}
-
-            # Encoding evaluation
-            _, _, test_data = load_MicroTraffic(train_set, dataset_dir='./datasets')
-            test_labels = np.zeros(test_data.shape[0])
-            eval_args = {'loader': 'MicroTraffic',
-                         'dataset': dataset,
-                         'data': test_data,
-                         'labels': test_labels,
-                         'model': model,
-                         'batch_size': 128}
-            local_dist_results = evaluate(local=True, **eval_args)
-            global_dist_results = evaluate(local=False, **eval_args)
-
-            key_values = {**pred_results, **local_dist_results, **global_dist_results}
-            keys = list(key_values.keys())
-            values = np.array(list(key_values.values())).astype(np.float32)
-            eval_results = read_saved_results() # read saved results again to avoid overwriting
-            eval_results.loc[(model_type, dataset), keys] = values
-
-            # Save evaluation results per dataset and model
-            eval_results.to_csv(results_dir)
+        # Save evaluation results per dataset and model
+        eval_results.to_csv(results_dir)
 
     print(f"Total time: {systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - initial_time))}")
     sys.exit(0)

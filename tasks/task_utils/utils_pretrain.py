@@ -14,7 +14,7 @@ from tasks.micro_modules.baselayers import SubGraph
 from modules.encoders import LSTMEncoder, GRUEncoder
 
 
-def define_encoder(loader, device, model_dir, continue_training):
+def define_encoder(loader, device, model_dir, continue_training=True):
     encoder = spclt_copy(loader)
     best_model = [entry.name for entry in os.scandir(f'{model_dir}') if entry.name.split('_')[-1] == 'net.pth'][0]
     encoder.load(os.path.join(model_dir, best_model), device)
