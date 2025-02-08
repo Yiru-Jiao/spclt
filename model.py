@@ -195,7 +195,6 @@ class spclt():
             
             # define scheduler
             if self.loader == 'UEA':
-                factor = 0.6
                 if train_data.shape[0]<5000:
                     patience = 4
                     cool_down_weight = 50
@@ -207,32 +206,31 @@ class spclt():
                     cool_down_model = int(cool_down_weight/2)
                     self.initial_cooldown = 0
             else:
-                factor = 0.4
                 if self.loader == 'MacroTraffic':
-                    patience = 4
-                    cool_down_weight = 6
-                    cool_down_model = 6
-                    self.initial_cooldown = 10
+                    patience = 3
+                    cool_down_weight = 10
+                    cool_down_model = 5
+                    self.initial_cooldown = 5
                 elif self.loader == 'MicroTraffic':
                     patience = 3
-                    cool_down_weight = 2
+                    cool_down_weight = 4
                     cool_down_model = 2
-                    self.initial_cooldown = 4
+                    self.initial_cooldown = 2
                 elif self.loader in ['MacroLSTM', 'MacroGRU']:
-                    patience = 4
-                    cool_down_weight = 6
-                    cool_down_model = 6
-                    self.initial_cooldown = 8
+                    patience = 3
+                    cool_down_weight = 8
+                    cool_down_model = 4
+                    self.initial_cooldown = 4
 
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                self.optimizer, mode='min', factor=factor, patience=patience, cooldown=cool_down_model,
-                threshold=1e-3, threshold_mode='rel', min_lr=self.lr*factor**15
+                self.optimizer, mode='min', factor=0.6, patience=patience, cooldown=cool_down_model,
+                threshold=1e-3, threshold_mode='rel', min_lr=self.lr*0.6**15
                 )
             
             if self.regularizer_config['reserve'] is not None:
                 self.scheduler_weight = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    self.optimizer_weight, mode='min', factor=factor, patience=patience, cooldown=cool_down_weight,
-                    threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*factor**15
+                    self.optimizer_weight, mode='min', factor=0.6, patience=patience, cooldown=cool_down_weight,
+                    threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*0.6**15
                     )
                 def scheduler_update(val_loss_log, val_batch_iter, val_loss):
                     val_loss_log[self.epoch_n+4, val_batch_iter, 0] = val_loss.item() - 0.5*self.loss_log_vars.sum().item()
@@ -422,7 +420,7 @@ class spclt():
 
         # define loss function
         self.loss_func = losses.combined_loss
-        
+
         if self.loss_config is None:
             self.loss_config = {'temporal_unit': 0, 'tau_inst': 0}
         else:
