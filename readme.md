@@ -9,6 +9,8 @@ After revision based on the advices from ICLR reviewers and extension, a new ver
 
 ## Dependencies
 
+`torch` `numba` `numpy` `scipy` `pandas` `tqdm` `scikit-learn` `tslearn` `h5py` `pytables` `zarr` `scikit-image`
+
 For an encapsulated environment, you may create a virtual environment with Python 3.12.4 and install the dependencies by running the following command:
 
 ```sh
@@ -42,3 +44,11 @@ To analyse and visualise the results, use `figures/visual.ipynb`. The notebook g
     pages = {arXiv:}
 }
 ```
+
+### Repo references
+Thanks to GitHub for offering the open environment, from which this work reuses/learns/adapts the following repositories to different extents:
+- TS2Vec https://github.com/zhihanyue/ts2vec
+- SoftCLT https://github.com/seunghan96/softclt
+- TopoAE https://github.com/BorgwardtLab/topological-autoencoders
+- GGAE https://github.com/JungbinLim/GGAE-public
+- TAM https://github.com/dmfolgado/tam/
