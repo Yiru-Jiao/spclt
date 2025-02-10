@@ -1,16 +1,12 @@
 **/*.*
 **/__pycache__
-scripts
 !**/*.md
 datasets/**/*.md
 !**/*.py
 datasets/**/*.py
-!**/*.ipynb
+!datasets/*.csv
+!figures/*.*
 test.ipynb
-results
-# !results/**/*.csv
-# !results/**/*.pth
-# !results/**/*.npy
 !readme.md
 !requirements.txt
 !.gitignore
