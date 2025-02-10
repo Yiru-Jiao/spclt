@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 - __Step 5:__ Apply the trained models for downstream tasks using `tasks/uea_classification.py`, `tasks/macro_progress.py`, and `tasks/micro_prediction.py` for UEA classification, macroTraffic traffic flow prediction, and microTraffic trajectory prediction. The completely trained models are saved in the `results/finetune` directory; the evaluation results are saved in the `results/evaluation` directory. We also make the models and evaluation results openly available*.
 
-*Note: The resulting data are too large (21.2 GB) to be provided in this repository. Please download them from the following link: https://surfdrive.surf.nl/files/index.php/s/2wNdn6MxIAndxrs
+*Note: The resulting data are too large (21.2 GB) to be provided in this repository. You are welcome to download them from the following link: https://surfdrive.surf.nl/files/index.php/s/2wNdn6MxIAndxrs
 
 ## Analysis and visualisation
 To analyse and visualise the results, use `figures/visual.ipynb`. The notebook generates tables and plots for the evaluation results and saves them in the `results/figures` directory.
