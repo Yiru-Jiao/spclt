@@ -1,8 +1,0 @@
-,tau_inst,tau_temp,temporal_hierarchy,bandwidth,batch_size,weight_lr
-TS2Vec_Phase1,0.0,0.0,,1.0,8.0,0.05
-SoftCLT_Phase1,0.0,2.5,exponential,1.0,8,0.05
-SoftCLT_Phase2,20.0,2.5,exponential,1.0,8,0.05
-TopoTS2Vec_Phase1,0.0,0.0,,1.0,8.0,0.01
-GGeoTS2Vec_Phase1,0.0,0.0,,1.0,8.0,0.05
-TopoSoftCLT_Phase1,20.0,2.5,exponential,1.0,8,0.05
-GGeoSoftCLT_Phase1,20.0,2.5,exponential,1.0,8,0.01
