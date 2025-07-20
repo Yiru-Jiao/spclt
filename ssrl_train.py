@@ -99,10 +99,6 @@ def main(args):
         eval_results.to_csv(results_dir)
 
     # Train for each dataset
-    bad_datasets = ['DuckDuckGeese',
-                    'EigenWorms',
-                    'MotorImagery',
-                    'PEMS-SF'] # Datasets that are too resource-consuming to compute DTW or TAM
     for dataset in dataset_list:
         # Load dataset
         if args.loader == 'UEA':
@@ -126,14 +122,7 @@ def main(args):
             continue
 
         # Compute similarity matrix
-        if args.loader == 'UEA':
-            if dataset in bad_datasets:
-                print(f"Dataset {dataset} is too resource-consuming to compute DTW or TAM, switch to EUC by default.")
-                args.dist_metric = 'EUC'
-            else:
-                args.dist_metric = 'DTW'
-        else:
-            args.dist_metric = 'EUC'
+        args.dist_metric = 'EUC'
         sim_mat = datautils.get_sim_mat(args.loader, train_data, dataset, args.dist_metric)
         
         # Set training epochs and verbose

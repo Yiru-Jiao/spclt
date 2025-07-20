@@ -31,7 +31,7 @@ def parse_args():
 
     # Set default parameters
     args.loader = 'UEA'
-    args.dist_metric = 'DTW'
+    args.dist_metric = 'EUC'
     args.sliding_padding = 0
     args.repr_dims = 320
     args.tau_inst = 0

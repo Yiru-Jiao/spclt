@@ -30,7 +30,7 @@ def normalize_TS(TS):
     return TS
 
 
-def compute_sim_mat(data, dist_metric='DTW'):
+def compute_sim_mat(data, dist_metric='EUC'):
     """
     Compute similarity matrix for time series, sim_mat.shape = (n_instance, n_instance)
     """
@@ -60,7 +60,7 @@ def compute_sim_mat(data, dist_metric='DTW'):
     return sim_mat
 
 
-def get_sim_mat(loader, data, dataset='', dist_metric='DTW', prefix='train'):
+def get_sim_mat(loader, data, dataset='', dist_metric='EUC', prefix='train'):
     if prefix=='train' and data.shape[0] > 7000:
         print(f"Data shape {data.shape} is too large, {dist_metric} similarity will be computed during training.")
         return None

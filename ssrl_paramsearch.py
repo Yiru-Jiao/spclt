@@ -141,11 +141,7 @@ def main(args):
         print(f"------Loaded dataset: {args.loader}-{dataset}------")
 
         # Load precomputed similarity matrix
-        if args.loader == 'UEA':
-            dist_metric = 'DTW'
-        else:
-            dist_metric = 'EUC'
-
+        dist_metric = 'EUC'
         sim_mat = datautils.get_sim_mat(args.loader, train_data, dataset, dist_metric)
         if sim_mat is None:
             sim_mat = np.nan * np.ones((train_data.shape[0], 1))

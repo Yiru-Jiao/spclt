@@ -50,19 +50,18 @@ def main(args):
         print(f"------ Loaded dataset: {args.loader}-{dataset}, train shape {train_data.shape}, test shape {test_data.shape} ------")
 
         # Compute similarity matrix (this is instance-wise only)
-        dist_metric_list = ['EUC', 'DTW']
-        for dist_metric in dist_metric_list:
-            sim_mat = datautils.get_sim_mat(args.loader, train_data, dataset, dist_metric=dist_metric, prefix='train')
-            if sim_mat is None:
-                print(f'Metric: {dist_metric}, shape: None')
-            else:
-                print(f'Metric: {dist_metric}, shape: {sim_mat.shape}, max.: {sim_mat.max():.2f}, min.: {sim_mat.min():.2f}')
-            
-            sim_mat = datautils.get_sim_mat(args.loader, test_data, dataset, dist_metric=dist_metric, prefix='test')
-            if sim_mat is None:
-                print(f'Metric: {dist_metric}, shape: None')
-            else:
-                print(f'Metric: {dist_metric}, shape: {sim_mat.shape}, max.: {sim_mat.max():.2f}, min.: {sim_mat.min():.2f}')
+        dist_metric = 'EUC'
+        sim_mat = datautils.get_sim_mat(args.loader, train_data, dataset, dist_metric=dist_metric, prefix='train')
+        if sim_mat is None:
+            print(f'Metric: {dist_metric}, shape: None')
+        else:
+            print(f'Metric: {dist_metric}, shape: {sim_mat.shape}, max.: {sim_mat.max():.2f}, min.: {sim_mat.min():.2f}')
+        
+        sim_mat = datautils.get_sim_mat(args.loader, test_data, dataset, dist_metric=dist_metric, prefix='test')
+        if sim_mat is None:
+            print(f'Metric: {dist_metric}, shape: None')
+        else:
+            print(f'Metric: {dist_metric}, shape: {sim_mat.shape}, max.: {sim_mat.max():.2f}, min.: {sim_mat.min():.2f}')
         print('--- Similarity precomputing completed, time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time()-start_time)) + ' ---')
 
     print('--- Time elapsed in total: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time()-start_time)) + ' ---')
