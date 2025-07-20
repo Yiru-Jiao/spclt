@@ -77,6 +77,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
         scheduler, vloss_log, stop_early = update_scheduler(scheduler, avg_loss, vloss_log, epoch_number, progress_bar)
         if stop_early:
             break
+    return epoch_number+1
 
 
 def test_run_point(testset, model, BATCH_SIZE):

@@ -177,11 +177,7 @@ def main(args):
 
             # Train model if not already trained or if training time is not recorded
             loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
-            if loss_log_exist:
-                eval_results = read_saved_results()
-                training_time = eval_results.loc[(model_type, dataset), 'training_time']
-                training_epochs = eval_results.loc[(model_type, dataset), 'training_epochs']
-            if loss_log_exist and (training_time > 0):
+            if loss_log_exist and (eval_results.loc[(model_type, dataset), 'training_time'] > 0):
                 print(f'--- {model_type} {dataset} has been trained, skip training ---')
             else:
                 # Create model
@@ -196,7 +192,12 @@ def main(args):
                 start_time = systime.time()
                 loss_log = model.fit(dataset, train_data, soft_assignments, args.epochs, args.iters, scheduler, verbose=verbose)
                 training_time = systime.time() - start_time
-                training_epochs = model.epoch_n
+
+                eval_results = read_saved_results()
+                eval_results.loc[(model_type, dataset), 'training_time'] = training_time
+                eval_results.loc[(model_type, dataset), 'training_epochs'] = model.epoch_n
+                eval_results.loc[(model_type, dataset), 'training_time_per_epoch'] = training_time/model.epoch_n
+                eval_results.to_csv(results_dir)
 
                 # Save loss log
                 save_loss_log(loss_log, model_dir, regularizer=args.regularizer)
@@ -210,17 +211,12 @@ def main(args):
                     os.remove(model_epoch)
                     if not model_type in ['ts2vec', 'softclt']:
                         os.remove(model_epoch.replace('_net.pth', '_loss_log_vars.npy'))
-            best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
+            latest_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
 
             # Save evaluation results per dataset and model
             eval_results = read_saved_results()
-            print(f'Best model {best_model} will be evaluated in downstream tasks on {dataset}')
-            
-            eval_results.loc[(model_type, dataset), 'training_time'] = training_time
-            eval_results.loc[(model_type, dataset), 'training_epochs'] = training_epochs
-            eval_results.loc[(model_type, dataset), 'training_time_per_epoch'] = training_time/training_epochs
-            eval_results.loc[(model_type, dataset), 'model_used'] = best_model
-
+            print(f'Best model {latest_model} will be evaluated in downstream tasks on {dataset}')
+            eval_results.loc[(model_type, dataset), 'model_used'] = latest_model
             eval_results.to_csv(results_dir)
 
     print('--- Total time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - initial_time)) + ' ---')

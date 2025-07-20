@@ -115,5 +115,6 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
         if np.all(abs(np.diff(vloss_log[epoch_number+2:epoch_number+5])/vloss_log[epoch_number+1:epoch_number+4])<5e-4):
             print('Early stopping at epoch {} with vloss {}'.format(epoch_number, avg_vloss))
             break
+    return epoch_number+1
 
         

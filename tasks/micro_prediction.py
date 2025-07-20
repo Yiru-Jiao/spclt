@@ -86,6 +86,7 @@ def main(args):
         eval_results = read_saved_results()
     else:
         metrics = pred_metrics + ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
+        metrics = metrics + ['finetuning_time', 'finetuning_epochs', 'finetuning_time_per_epoch']
         eval_results = pd.DataFrame(np.zeros((len(model_list), 12), dtype=np.float32), columns=metrics,
                                     index=pd.MultiIndex.from_product([model_list,train_set], names=['model','dataset']))
         eval_results.to_csv(results_dir)
@@ -114,19 +115,26 @@ def main(args):
         scheduler_epoch = ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=4, cooldown=0,
                                             threshold=1e-3, threshold_mode='rel', min_lr=0.001*0.6**10)
 
-        # Train model if not already trained
-        if os.path.exists(os.path.join(save_dir, f'decoder_{model_type}.pth')):
+        # Train model if not already trained or if finetuning time is not recorded
+        model_trained = os.path.exists(os.path.join(save_dir, f'decoder_{model_type}.pth'))
+        if model_trained and (eval_results.loc[(model_type, dataset), 'finetuning_time'] > 0):
             print(f'--- {model_type} has been trained ---')
         else:
             print(f'--- Training {model_type} ---')
             start_time = systime.time()
-            train_model(paralist['epochs'], paralist['batch_size'], trainset, model, 
+            finetuning_epochs = train_model(paralist['epochs'], paralist['batch_size'], trainset, model, 
                         optimizer, validation_loader, OverAllLoss(paralist).to(device),
                         scheduler_heatmap, scheduler_epoch, mode=paralist['mode'])
             finetuning_time = systime.time() - start_time
             torch.save(model.encoder.state_dict(), os.path.join(save_dir, f'encoder_{model_type}.pth'))
             torch.save(model.decoder.state_dict(), os.path.join(save_dir, f'decoder_{model_type}.pth'))
-            print(f'Training time for {model_type}: ' + systime.strftime('%H:%M:%S', systime.gmtime(finetuning_time)))
+
+            eval_results = read_saved_results() # read saved results again to avoid overwriting
+            eval_results.loc[(model_type, dataset), 'finetuning_time'] = finetuning_time
+            eval_results.loc[(model_type, dataset), 'finetuning_epochs'] = finetuning_epochs
+            eval_results.loc[(model_type, dataset), 'finetuning_time_per_epoch'] = finetuning_time / finetuning_epochs
+            eval_results.to_csv(results_dir)
+            print(f'Finetuning time for {model_type}: ' + systime.strftime('%H:%M:%S', systime.gmtime(finetuning_time)))
 
         # Evaluate models
         if eval_results.loc[(model_type, dataset), 'global_mean_continuity'] > 0:

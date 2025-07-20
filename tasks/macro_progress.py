@@ -149,10 +149,17 @@ def main(args):
         else:
             print(f'--- Training {model_type} ---')
             start_time = systime.time()
-            train_model(EPOCH_NUMBER, BATCH_SIZE, trainset, model,
+            finetuning_epochs = train_model(EPOCH_NUMBER, BATCH_SIZE, trainset, model,
                         optimizer, validation_loader, MSE_scale().to(device),
                         scheduler, para['horizon'], beta=-0.07, save_progress=save_dir+model_type)
             finetuning_time = systime.time() - start_time
+
+            eval_results = read_saved_results() # read saved results again to avoid overwriting
+            eval_results.loc[(model_type, dataset), 'finetuning_time'] = finetuning_time
+            eval_results.loc[(model_type, dataset), 'finetuning_epochs'] = finetuning_epochs
+            eval_results.loc[(model_type, dataset), 'finetuning_time_per_epoch'] = finetuning_time / finetuning_epochs
+            eval_results.to_csv(results_dir)
+
             print(f'Training time for {model_type}: ' + systime.strftime('%H:%M:%S', systime.gmtime(finetuning_time)))
 
         # Evaluate models
