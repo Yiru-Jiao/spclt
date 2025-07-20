@@ -15,7 +15,7 @@ import model_utils.utils_data as datautils
 class spclt():
     def __init__(
         self, loader,
-        input_dims, output_dims=320, hidden_dims=64, dist_metric='DTW',
+        input_dims, output_dims=320, hidden_dims=64, dist_metric='EUC',
         depth=10, device='cuda', lr=0.001, weight_lr=0.05, batch_size=8,
         after_iter_callback=None, after_epoch_callback=None,
         loss_config=None,
@@ -38,32 +38,30 @@ class spclt():
                 
         # define encoder
         if self.loader == 'UEA':
-            self._net = encoders.TSEncoder(input_dims=input_dims,
+            self.net = encoders.TSEncoder(input_dims=input_dims,
                                           output_dims=output_dims,
                                           hidden_dims=hidden_dims, 
                                           depth=depth).to(self.device)
         elif self.loader == 'MacroTraffic':
             mat_A = encoders.adjacency_matrix(3)
             mat_B = encoders.adjacency_matrixq(3, 8)
-            self._net = encoders.DGCNEncoder(nb_node=193, 
+            self.net = encoders.DGCNEncoder(nb_node=193, 
                                             dim_feature=128, 
                                             A=mat_A, B=mat_B).to(self.device)
         elif self.loader == 'MicroTraffic':
-            self._net = encoders.SubGraph(8, 128, 9, 3).to(self.device)
+            self.net = encoders.SubGraph(8, 128, 9, 3).to(self.device)
         elif self.loader == 'MacroLSTM':
-            self._net = encoders.LSTMEncoder(input_dim=193*2,
+            self.net = encoders.LSTMEncoder(input_dim=193*2,
                                             hidden_dim=193*4,
                                             num_layers=2, 
                                             single_output=True).to(self.device)
         elif self.loader == 'MacroGRU':
-            self._net = encoders.GRUEncoder(input_dim=193*2,
+            self.net = encoders.GRUEncoder(input_dim=193*2,
                                            hidden_dim=193*4,
                                            num_layers=2,
                                            single_output=True).to(self.device)
-
-        # self._net.apply(self.initialize_weights) # random initialization
-        self.net = torch.optim.swa_utils.AveragedModel(self._net).to(self.device)
-        self.net.update_parameters(self._net)
+        else:
+            raise ValueError(f'Undefined loader: {self.loader}')
 
         # define learner of log variances used for weighing losses
         if self.regularizer_config['reserve'] == 'both':
@@ -78,31 +76,17 @@ class spclt():
     # define eval() and train() functions
     def eval(self,):
         if self.regularizer_config['reserve'] is None:
-            self._net.eval()
             self.net.eval()
         else:
-            self._net.eval()
             self.net.eval()
             self.loss_log_vars.requires_grad = False
 
     def train(self,):
         if self.regularizer_config['reserve'] is None:
-            self._net.train()
             self.net.train()
         else:
-            self._net.train()
             self.net.train()
             self.loss_log_vars.requires_grad = True
-
-    def initialize_weights(self, m):
-        if isinstance(m, torch.nn.Linear):
-            torch.nn.init.xavier_normal_(m.weight)
-            if m.bias is not None:
-                torch.nn.init.zeros_(m.bias)
-        elif isinstance(m, torch.nn.Conv1d):
-            torch.nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
-            if m.bias is not None:
-                torch.nn.init.zeros_(m.bias)
 
 
     def fit(self, name_data, train_data, soft_assignments=None, n_epochs=None, n_iters=None, scheduler='constant', verbose=0):
@@ -143,7 +127,7 @@ class spclt():
             ValueError('At least one between n_epochs and n_iters should be specified')
         
         # define optimizer
-        self.optimizer = torch.optim.AdamW(self._net.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.AdamW(self.net.parameters(), lr=self.lr)
         if self.regularizer_config['reserve'] is not None:
             self.optimizer_weight = torch.optim.AdamW([self.loss_log_vars], lr=self.weight_lr)
             def optimizer_zero_grad():
@@ -302,7 +286,6 @@ class spclt():
 
                 loss.backward()
                 optimizer_step()
-                self.net.update_parameters(self._net)
 
                 # save model if callback every several iterations
                 if self.after_iter_callback is not None:
@@ -403,7 +386,7 @@ class spclt():
         """
         Computes the loss for the given validation data and soft assignments.
         """
-        assert self._net is not None, 'please train or load a model first'
+        assert self.net is not None, 'please train or load a model first'
         if isinstance(soft_assignments, np.ndarray):
             assert soft_assignments.shape[0] == soft_assignments.shape[1]
             assert val_data.shape[0] == soft_assignments.shape[0] if soft_assignments is not None else True
@@ -431,7 +414,7 @@ class spclt():
         else:
             loss_config['temporal_unit'] = 0
  
-        org_training = self._net.training
+        org_training = self.net.training
         self.eval()
         with torch.no_grad():
             for val_batch_iter, (x, idx) in enumerate(val_loader):
@@ -640,9 +623,7 @@ class spclt():
         """
         state_dict = torch.load(fn+'_net.pth', map_location=self.device, weights_only=True)
         self.net.load_state_dict(state_dict)
-        self._net = self.net
         self.net.eval()
-        self._net.eval()
         if self.regularizer_config['reserve'] is not None:
             state_loss_log_vars = np.load(fn+'_loss_log_vars.npy')
             state_loss_log_vars = torch.from_numpy(state_loss_log_vars).to(self.device)

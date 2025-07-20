@@ -31,21 +31,21 @@ class spclt_copy():
         if loader == 'MacroTraffic':
             mat_A = adjacency_matrix(3)
             mat_B = adjacency_matrixq(3, 8)
-            self._net = Encoder(nb_node=193, dim_feature=128, A=mat_A, B=mat_B)
+            self.net = Encoder(nb_node=193, dim_feature=128, A=mat_A, B=mat_B)
         elif loader == 'MicroTraffic':
-            self._net = SubGraph(8, 128, 9, 3)
+            self.net = SubGraph(8, 128, 9, 3)
         elif loader == 'MacroLSTM':
-            self._net = LSTMEncoder(input_dim=193*2, 
-                                    hidden_dim=193*4, 
-                                    num_layers=2, 
-                                    single_output=False)
-        elif loader == 'MacroGRU':
-            self._net = GRUEncoder(input_dim=193*2, 
+            self.net = LSTMEncoder(input_dim=193*2, 
                                    hidden_dim=193*4, 
                                    num_layers=2, 
                                    single_output=False)
-        self.net = torch.optim.swa_utils.AveragedModel(self._net)
-        self.net.update_parameters(self._net)
+        elif loader == 'MacroGRU':
+            self.net = GRUEncoder(input_dim=193*2, 
+                                  hidden_dim=193*4, 
+                                  num_layers=2, 
+                                  single_output=False)
+        else:
+            raise ValueError(f'Undefined loader: {loader}')
 
     def load(self, fn, device):
         state_dict = torch.load(fn, map_location=device, weights_only=True)
