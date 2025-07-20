@@ -134,16 +134,18 @@ def main(args):
         train_size = train_data.shape[0]
         feature_size = train_data.shape[-1]
         if args.loader != 'UEA':
-            args.epochs = 300
-            verbose = 2
+            args.epochs = 250
+            verbose = 3
         else:
             if train_size < 1000 and train_data.shape[-2] < 1000:
-                args.epochs = 1000
+                args.epochs = 500
+                verbose = 10
             elif train_size < 3000:
-                args.epochs = 600
+                args.epochs = 300
+                verbose = 5
             else:
-                args.epochs = 400
-            verbose = 1
+                args.epochs = 150
+                verbose = 3
 
         # Iterate over different losses
         for model_type in model_list:

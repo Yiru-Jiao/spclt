@@ -174,8 +174,8 @@ def main(args):
             test_sim_mat = datautils.get_sim_mat(args.loader, test_data, dataset, args.dist_metric, prefix='test')
             test_soft_assignments = datautils.assign_soft_labels(test_sim_mat, args.tau_inst)
             loss_results = model.compute_loss(test_data, test_soft_assignments, non_regularized=False)
-            loss_results = {'scl_loss': loss_results[1],
-                            'sp_loss': loss_results[3] if args.regularizer is not None else np.nan}
+            loss_results = {'scl_loss': loss_results[0],
+                            'sp_loss': loss_results[2] if args.regularizer is not None else np.nan}
 
             # Save evaluation results
             key_values = {**clf_clr_results, **loss_results, **local_dist_results, **global_dist_results}

@@ -105,7 +105,7 @@ class spclt():
         # Set default number for n_iters, this is intended for underfitting the model
         if n_iters is None and n_epochs is None:
             num_samples = train_data.shape[0]
-            n_iters = num_samples * 32 / self.batch_size
+            n_iters = num_samples // 2
             sample_bounds = [100, 500, 1000, 10000]
             coefs = [2, 1, 0.5, 0.25]
             for bound, coef in zip(sample_bounds, coefs):
@@ -113,17 +113,17 @@ class spclt():
                     n_iters = int(n_iters * coef)
                     break
             if num_samples >= sample_bounds[-1]:
-                n_iters = int(n_iters / 8)
+                n_iters = n_iters // 8
 
         # define a progress bar
         if n_epochs is not None:
             if verbose:
-                progress_bar = tqdm(range(n_epochs), desc=f'Train {name_data} epoch', ascii=True, dynamic_ncols=False, miniters=10)
+                progress_bar = tqdm(range(n_epochs), desc=f'Train {name_data} epoch', ascii=True, dynamic_ncols=False)
             else:
                 progress_bar = range(n_epochs)
         elif n_iters is not None:
             if verbose:
-                progress_bar = tqdm(range(n_iters), desc=f'Train {name_data} iter', ascii=True, dynamic_ncols=False, miniters=100)
+                progress_bar = tqdm(range(n_iters), desc=f'Train {name_data} iter', ascii=True, dynamic_ncols=False)
             else:
                 progress_bar = range(n_iters)
         else:
@@ -183,62 +183,66 @@ class spclt():
             # define scheduler
             if self.loader == 'UEA':
                 if train_data.shape[0]<5000:
-                    patience = 4
-                    cool_down_weight = 50
-                    cool_down_model = int(cool_down_weight/2)
-                    self.initial_cooldown = 0
+                    patience = 10
+                    self.initial_cooldown_weight = 50
+                    self.initial_cooldown_model = 25
                 else:
-                    patience = 3
-                    cool_down_weight = 25
-                    cool_down_model = int(cool_down_weight/2)
-                    self.initial_cooldown = 0
+                    patience = 6
+                    self.initial_cooldown_weight = 20
+                    self.initial_cooldown_model = 10
             else:
                 if self.loader == 'MacroTraffic':
-                    patience = 3
-                    cool_down_weight = 10
-                    cool_down_model = 5
-                    self.initial_cooldown = 5
+                    patience = 8
+                    self.initial_cooldown_weight = 10
+                    self.initial_cooldown_model = 5
                 elif self.loader == 'MicroTraffic':
-                    patience = 3
-                    cool_down_weight = 4
-                    cool_down_model = 2
-                    self.initial_cooldown = 2
+                    patience = 6
+                    self.initial_cooldown_weight = 4
+                    self.initial_cooldown_model = 2
                 elif self.loader in ['MacroLSTM', 'MacroGRU']:
-                    patience = 3
-                    cool_down_weight = 8
-                    cool_down_model = 4
-                    self.initial_cooldown = 4
+                    patience = 8
+                    self.initial_cooldown_weight = 8
+                    self.initial_cooldown_model = 4
 
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                self.optimizer, mode='min', factor=0.6, patience=patience, cooldown=cool_down_model,
-                threshold=1e-3, threshold_mode='rel', min_lr=self.lr*0.6**15
+                self.optimizer, mode='min', factor=0.4, patience=patience, cooldown=0,
+                threshold=1e-3, threshold_mode='rel', min_lr=self.lr*0.4**30
                 )
             
             if self.regularizer_config['reserve'] is not None and not self.regularizer_config['baseline']:
                 self.scheduler_weight = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    self.optimizer_weight, mode='min', factor=0.6, patience=patience, cooldown=cool_down_weight,
-                    threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*0.6**15
+                    self.optimizer_weight, mode='min', factor=0.6, patience=patience//2, cooldown=0,
+                    threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*0.6**50
                     )
-                def scheduler_update(val_loss_log, val_batch_iter, val_loss):
-                    val_loss_log[self.epoch_n+4, val_batch_iter, 0] = val_loss.item() - 0.5*self.loss_log_vars.sum().item()
-                    val_loss_log[self.epoch_n+4, val_batch_iter, 1] = 0.5*self.loss_log_vars.sum().item()
+                def scheduler_update(val_loss, regularizer_loss, loss):
+                    log_sum = 0.5*self.loss_log_vars.sum()
+                    val_loss += (loss - log_sum)
+                    regularizer_loss += log_sum
+                    return val_loss, regularizer_loss
+                def scheduler_step(val_loss_log, val_loss, regularizer_loss):
+                    val_loss_log[self.epoch_n+4, 0] = val_loss
+                    val_loss_log[self.epoch_n+4, 1] = regularizer_loss
+                    if self.epoch_n > self.initial_cooldown_model:
+                        self.scheduler.step(val_loss)
+                    if self.epoch_n > self.initial_cooldown_weight:
+                        self.scheduler_weight.step(regularizer_loss)
                     return val_loss_log
-                def scheduler_step(val_loss, regularizer_loss):
-                    self.scheduler.step(val_loss)
-                    self.scheduler_weight.step(regularizer_loss)
             else:
-                def scheduler_update(val_loss_log, val_batch_iter, val_loss):
-                    val_loss_log[self.epoch_n+4, val_batch_iter, 0] = val_loss.item()
-                    val_loss_log[self.epoch_n+4, val_batch_iter, 1] = val_loss.item()
+                def scheduler_update(val_loss, regularizer_loss, loss):
+                    val_loss += loss
+                    return val_loss, val_loss
+                def scheduler_step(val_loss_log, val_loss, regularizer_loss):
+                    val_loss_log[self.epoch_n+4, 0] = val_loss
+                    val_loss_log[self.epoch_n+4, 1] = val_loss
+                    if self.epoch_n > self.initial_cooldown_model:
+                        self.scheduler.step(val_loss)
                     return val_loss_log
-                def scheduler_step(val_loss, regularizer_loss):
-                    self.scheduler.step(val_loss)
 
             if n_epochs is not None:
-                val_loss_log = np.zeros((n_epochs+4, len(val_loader), 2)) * np.nan
+                val_loss_log = np.zeros((n_epochs+4, 2)) * np.nan
             else:
-                val_loss_log = np.zeros((int(n_iters/len(val_loader))+4, len(val_loader), 2)) * np.nan
-            val_loss_log[:4,...] = np.array([[[init_loss]*2]*len(val_loader) for init_loss in range(100, 96, -1)])
+                val_loss_log = np.zeros((int(n_iters/len(val_loader))+4, 2)) * np.nan
+            val_loss_log[:4,:] = np.array([[init_loss]*2 for init_loss in range(5, 1, -1)])
         else:
             ValueError("Undefined scheduler: should be either 'constant' or 'reduced'.")
 
@@ -246,7 +250,7 @@ class spclt():
         train_dataset = datautils.custom_dataset(torch.from_numpy(train_data).float(), self.loader)
         train_loader = DataLoader(train_dataset, batch_size=min(self.batch_size, len(train_dataset)), shuffle=True, drop_last=True)
         if n_iters is None:
-            log_len = n_epochs*len(train_loader)
+            log_len = n_epochs
         else:
             log_len = n_iters
         if self.regularizer_config['reserve'] is None:
@@ -269,6 +273,8 @@ class spclt():
                                                    ## When training on a very long sequence, increasing this helps to reduce the cost of time and memory.
         continue_training = True
         while continue_training:
+            train_loss = torch.tensor(0., device=self.device, requires_grad=False)
+            train_loss_comp = {}
             for train_batch_iter, (x, idx) in enumerate(train_loader, start=1):
                 if train_soft_assignments is None:
                     soft_labels = None
@@ -286,38 +292,44 @@ class spclt():
                 loss, loss_comp = self.loss_func(self, x.to(self.device),
                                                  train_loss_config, 
                                                  self.regularizer_config)
-
                 loss.backward()
                 optimizer_step()
+
+                train_loss += loss
+                if len(train_loss_comp) == 0:
+                    for key in loss_comp:
+                        train_loss_comp[key] = torch.tensor(0., device=self.device, requires_grad=False)                    
+                for key in train_loss_comp:
+                    train_loss_comp[key] += loss_comp[key]
 
                 # save model if callback every several iterations
                 if self.after_iter_callback is not None:
                     self.after_iter_callback(self)
 
-                # save iteration loss
-                loss_log[self.iter_n] = [loss.item()] + list(loss_comp.values())
-
                 # update progress bar if n_iters is specified
                 if n_iters is not None and verbose:
-                    if verbose > 1:
-                        progress_bar.set_postfix(loss=loss.item())
-                        progress_bar.update(1)
-                    else: # update every 20% of the total iterations
-                        step = n_iters // 5
-                        if (self.iter_n+1) % step == 0:
-                            progress_bar.set_postfix(loss=loss.item())
-                            progress_bar.update(step)
+                    if n_iters % verbose == (verbose-1):
+                        progress_bar.set_postfix(loss=loss.item(), refresh=False)
+                        progress_bar.update(verbose)
 
                 self.iter_n += 1
                 if n_iters is not None and self.iter_n >= n_iters:
                     continue_training = False
                     break
 
+            # save average loss per epoch
+            train_loss /= train_batch_iter
+            for key in train_loss_comp:
+                train_loss_comp[key] = (train_loss_comp[key] / train_batch_iter).item()
+            loss_log[self.epoch_n] = [train_loss.item()] + list(train_loss_comp.values())
+
             # if the scheduler is set to 'reduced', evaluate validation loss and update learning rate
             if scheduler == 'reduced':
                 self.eval()
+                val_loss = torch.tensor(0., device=self.device, requires_grad=False)
+                regularizer_loss = torch.tensor(0., device=self.device, requires_grad=False)
                 with torch.no_grad():
-                    for val_batch_iter, (x, idx) in enumerate(val_loader):
+                    for val_batch_iter, (x, idx) in enumerate(val_loader, start=1):
                         if val_soft_assignments is None:
                             soft_labels = None
                         elif isinstance(val_soft_assignments, str):
@@ -330,20 +342,18 @@ class spclt():
                         val_loss_config = self.loss_config.copy()
                         val_loss_config['soft_labels'] = soft_labels
 
-                        val_loss, _ = self.loss_func(self, x.to(self.device),
+                        loss, _ = self.loss_func(self, x.to(self.device),
                                                      val_loss_config, 
                                                      self.regularizer_config)
-                        val_loss_log = scheduler_update(val_loss_log, val_batch_iter, val_loss)
-                if self.epoch_n >= self.initial_cooldown:
-                    scheduler_step(val_loss_log[self.epoch_n+4, :, 0].mean(),
-                                   val_loss_log[self.epoch_n+4, :, 1].mean())
+                        val_loss, regularizer_loss = scheduler_update(val_loss, regularizer_loss, loss)
+                val_loss /= val_batch_iter
+                regularizer_loss /= val_batch_iter
+                scheduler_step(val_loss_log, val_loss.item(), regularizer_loss.item())
                 self.train()
 
-                stop_condition1 = np.all(abs(np.diff(val_loss_log[self.epoch_n:self.epoch_n+8, :, 0].mean(axis=1)))<1e-3)
-                stop_condition2 = np.all(abs(np.diff(val_loss_log[self.epoch_n:self.epoch_n+5, :, 0].mean(axis=1)))<5e-4)
-                if stop_condition1 or stop_condition2:
-                    # early stopping if validation loss converges
-                    Warning('Early stopping due to validation loss convergence.')
+                if np.all(abs(np.diff(val_loss_log[self.epoch_n+2:self.epoch_n+5, 0])/val_loss_log[self.epoch_n+1:self.epoch_n+4, 0]) < 5e-4):
+                    Warning('Early stopping if validation loss converges.')
+                    continue_training = False
                     break
 
             # save model if callback every several epochs
@@ -352,24 +362,16 @@ class spclt():
 
             # update progress bar if n_epochs is specified
             if n_epochs is not None and verbose:
-                avg_batch_loss = loss_log[self.iter_n-train_batch_iter:self.iter_n, 0].mean()
+                avg_batch_loss = loss_log[self.epoch_n, 0]
                 if scheduler == 'reduced':
-                    avg_val_loss = val_loss_log[self.epoch_n+4, :, 0].mean()
+                    avg_val_loss = val_loss_log[self.epoch_n+4, 0].mean()
                     current_lr = self.optimizer.param_groups[0]['lr']
-                if verbose > 1:
+                if n_epochs % verbose == (verbose-1):
                     if scheduler == 'reduced':
-                        progress_bar.set_postfix(loss=avg_batch_loss, val_loss=avg_val_loss, lr=current_lr)
+                        progress_bar.set_postfix(loss=avg_batch_loss, val_loss=avg_val_loss, lr=current_lr, refresh=False)
                     else:
-                        progress_bar.set_postfix(loss=avg_batch_loss)
-                    progress_bar.update(1)
-                else: # update every 20% of the total epochs
-                    step = n_epochs // 5
-                    if (self.epoch_n+1) % step == 0:
-                        if scheduler == 'reduced':
-                            progress_bar.set_postfix(loss=avg_batch_loss, val_loss=avg_val_loss, lr=current_lr)
-                        else:
-                            progress_bar.set_postfix(loss=avg_batch_loss)
-                        progress_bar.update(step)
+                        progress_bar.set_postfix(loss=avg_batch_loss, refresh=False)
+                    progress_bar.update(verbose)
 
             self.epoch_n += 1
             if n_epochs is not None and self.epoch_n >= n_epochs:
@@ -419,8 +421,9 @@ class spclt():
  
         org_training = self.net.training
         self.eval()
+        val_loss_comp = {}
         with torch.no_grad():
-            for val_batch_iter, (x, idx) in enumerate(val_loader):
+            for val_batch_iter, (x, idx) in enumerate(val_loader, start=1):
                 if soft_assignments is None:
                     soft_labels = None
                 elif isinstance(soft_assignments, str):
@@ -433,17 +436,25 @@ class spclt():
                 val_loss_config = loss_config.copy()
                 val_loss_config['soft_labels'] = soft_labels
 
-                val_loss, val_loss_comp = self.loss_func(self, x.to(self.device),
+                loss, loss_comp = self.loss_func(self, x.to(self.device),
                                                          val_loss_config, 
                                                          self.regularizer_config)
-                val_loss_log[val_batch_iter] = [val_loss.item()] + list(val_loss_comp.values())
+                if len(val_loss_comp) == 0:
+                    for key in loss_comp:
+                        val_loss_comp[key] = torch.tensor(0., device=self.device, requires_grad=False)
+                for key in val_loss_comp:
+                    val_loss_comp[key] += loss_comp[key]
+                
         if org_training:
             self.train()
 
+        for key in val_loss_comp:
+            val_loss_comp[key] = (val_loss_comp[key] / val_batch_iter).item()
+
         if non_regularized:
-            return val_loss_log[:, 1].mean()
+            return val_loss_comp['loss_scl']
         else:
-            return val_loss_log.mean(axis=0)
+            return val_loss_comp.values()
 
 
     def _eval_with_pooling(self, x, mask=None, slicing=None, encoding_window=None):

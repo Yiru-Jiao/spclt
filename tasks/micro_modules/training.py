@@ -7,9 +7,10 @@ from micro_modules.interaction_dataset import *
 
 
 def train_one_epoch(epoch_index, batch_size, model, optimizer, loss_2, training_loader, scheduler, mode):
-
-    running_loss = 0.
+    device = next(iter(training_loader))[0][0].device
+    running_loss = torch.tensor(0., device=device, requires_grad=False)
     last_loss = 0.
+    model.train()
     
     if mode=="lanescore":
         for j, data in enumerate(training_loader):
@@ -17,14 +18,13 @@ def train_one_epoch(epoch_index, batch_size, model, optimizer, loss_2, training_
             optimizer.zero_grad()
             lsp, heatmap, heatmap_reg = model(traj, splines, masker, lanefeature, adj, af, ar, c_mask)
             loss = loss_2([lsp, heatmap, heatmap_reg], [ls, y])
-            # print('lanescore loss:'+str(loss.item()),end='\r')
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss
             if j % 800 == 799:
                 scheduler.step()
-                last_loss = running_loss / 800
+                last_loss = running_loss.item() / 800
                 # print('lanescore batch {} loss: {}'.format(j + 1, last_loss))
                 tb_x = epoch_index * len(training_loader) + j + 1
                 running_loss = 0.
@@ -38,14 +38,13 @@ def train_one_epoch(epoch_index, batch_size, model, optimizer, loss_2, training_
             loss = loss_2(heatmap, y)
             #loss2 = loss_2(heatmap2, y)
             #loss = loss1 + loss2
-            # print('testmodel loss:'+str(loss.item()),end='\r')
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss
             if j % 800 == 799:
                 scheduler.step()
-                last_loss = running_loss / 800
+                last_loss = running_loss.item() / 800
                 # print('testmodel batch {} loss: {}'.format(j + 1, last_loss))
                 tb_x = epoch_index * len(training_loader) + j + 1
                 running_loss = 0.
@@ -56,14 +55,13 @@ def train_one_epoch(epoch_index, batch_size, model, optimizer, loss_2, training_
             optimizer.zero_grad()
             yp = model(x, y)
             loss = loss_2(yp, y)
-            # print('traj loss:'+str(loss.item()),end='\r')
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss
             if j % 800 == 799:
                 scheduler.step()
-                last_loss = running_loss / 800
+                last_loss = running_loss.item() / 800
                 # print('traj batch {} loss: {}'.format(j + 1, last_loss))
                 tb_x = epoch_index * len(training_loader) + j + 1
                 running_loss = 0.
@@ -77,7 +75,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
     progress_bar = tqdm(range(EPOCHS), desc='EPOCH', ascii=True, dynamic_ncols=False, miniters=int(EPOCHS/5))
 
     vloss_log = np.zeros(EPOCHS+4)
-    vloss_log[:4] = [100, 99, 98, 97]
+    vloss_log[:4] = [4, 3, 2, 1]
     for epoch_number in progress_bar:
         model.train(True)
         #model.half()
@@ -114,7 +112,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
         vloss_log[4+epoch_number] = avg_vloss
         progress_bar.set_postfix({'loss': avg_loss, 'vloss': avg_vloss})
 
-        if np.all(abs(np.diff(vloss_log[epoch_number:epoch_number+5]))<1e-4):
+        if np.all(abs(np.diff(vloss_log[epoch_number+2:epoch_number+5])/vloss_log[epoch_number+1:epoch_number+4])<5e-4):
             print('Early stopping at epoch {} with vloss {}'.format(epoch_number, avg_vloss))
             break
 

@@ -10,7 +10,8 @@ from macro_modules.custom_dataset import *
 
 def train_one_epoch(model, optimizer, loss_func, training_loader, beta, count, T):
     model.train()
-    running_loss = 0.
+    device = next(iter(training_loader))[0].device
+    running_loss = torch.tensor(0., device=device, requires_grad=False)
     last_loss = 0.
     
     for j, data in enumerate(training_loader):
@@ -21,10 +22,10 @@ def train_one_epoch(model, optimizer, loss_func, training_loader, beta, count, T
         loss.backward()
         optimizer.step()
 
-        running_loss += loss.item()
+        running_loss += loss
     
     count += 1
-    last_loss = running_loss / (j + 1)
+    last_loss = running_loss.item() / (j + 1)
     running_loss = 0.
     return last_loss, count
 
@@ -50,7 +51,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
             progress_bar.set_postfix({'loss': avg_loss, 'vloss': avg_vloss})
             stop_early = False
             vloss_log[5+epoch_number] = avg_vloss
-            if np.all(abs(np.diff(vloss_log[epoch_number:epoch_number+6]))<1e-4):
+            if np.all(abs(np.diff(vloss_log[epoch_number+3:epoch_number+6])/vloss_log[epoch_number+2:epoch_number+5])<5e-4):
                 print('Early stopping at epoch', epoch_number, 'with validation loss', avg_vloss)
                 stop_early = True
         elif isinstance(scheduler, torch.optim.lr_scheduler.StepLR):
@@ -65,7 +66,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
         return scheduler, vloss_log, stop_early
 
     vloss_log = np.zeros(EPOCHS+5)
-    vloss_log[:5] = [100, 99, 98, 97, 96]
+    vloss_log[:5] = [5, 4, 3, 2, 1]
     progress_bar = tqdm(range(EPOCHS), desc='EPOCH', ascii=True, dynamic_ncols=False, miniters=int(EPOCHS/5))
     for epoch_number in progress_bar:
         avg_loss, count = train_one_epoch(model, optimizer, loss_func, training_loader, beta, count, T)

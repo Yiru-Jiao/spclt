@@ -111,7 +111,7 @@ def main(args):
             model = UQnet(paralist, test=False, drivable=False, traj_encoder=sp_encoder).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         scheduler_heatmap = StepLR(optimizer, step_size=1, gamma=0.975)
-        scheduler_epoch = ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=3, cooldown=2,
+        scheduler_epoch = ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=4, cooldown=0,
                                             threshold=1e-3, threshold_mode='rel', min_lr=0.001*0.6**10)
 
         # Train model if not already trained
