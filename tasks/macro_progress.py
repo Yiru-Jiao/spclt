@@ -130,6 +130,8 @@ def main(args):
             model_dir = f'./results/pretrain/{loader}/{model_type}/{dataset}/'
             sp_encoder = utils_pre.define_encoder(loader, device, model_dir, continue_training=True)
         learning_rate = 0.001
+        if args.reproduction: # Reset the random seed for each run
+            utils_pre.fix_seed(args.seed, deterministic=args.reproduction)
         model, BATCH_SIZE = define_model(args.prediction_model, sp_encoder)
 
         if args.prediction_model == 'DGCN':

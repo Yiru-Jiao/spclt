@@ -93,9 +93,11 @@ def main(args):
                 best_params[key] = [value]
         return best_params
 
-    def search_best_params(parameters2search, params, search_space, grid_search_args):
+    def search_best_params(parameters2search, params, search_space, grid_search_args, args=args):
         for parameter in parameters2search:
             params = {**params, parameter: search_space[parameter]}
+        if args.reproduction: # Reset the random seed for each run
+            fix_seed(args.seed, deterministic=args.reproduction)
         best_params, best_score = grid_search(params, **grid_search_args)
         for parameter in parameters2search:
             params = {**params, parameter: [best_params[parameter]]}

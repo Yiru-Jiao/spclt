@@ -134,6 +134,8 @@ def main(args):
             else:
                 print(f'--- {model_type} {dataset} was not trained, skipping ---')
                 continue
+            if args.reproduction: # Reset the random seed for each run
+                fix_seed(args.seed, deterministic=args.reproduction)
             model = spclt(args.loader, **model_config)
             model.load(f'{model_dir}/{best_model}')
 

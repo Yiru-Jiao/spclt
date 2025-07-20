@@ -100,6 +100,8 @@ def main(args):
         # Define model
         paralist['resolution'] = 1.
         paralist['inference'] = False
+        if args.reproduction: # Reset the random seed for each run
+            utils_pre.fix_seed(args.seed, deterministic=args.reproduction)
 
         if model_type == 'original':
             model = UQnet(paralist, test=False, drivable=False).to(device)

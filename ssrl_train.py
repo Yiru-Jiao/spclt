@@ -184,6 +184,8 @@ def main(args):
             else:
                 # Create model
                 model_config['after_epoch_callback'] = save_checkpoint_callback(model_dir, 0, unit='epoch')
+                if args.reproduction: # Reset the random seed for each run
+                    fix_seed(args.seed, deterministic=args.reproduction)
                 model = spclt(args.loader, **model_config)
 
                 scheduler = 'reduced'
