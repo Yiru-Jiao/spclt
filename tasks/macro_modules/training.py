@@ -66,7 +66,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
 
     vloss_log = np.zeros(EPOCHS+5)
     vloss_log[:5] = [100, 99, 98, 97, 96]
-    progress_bar = tqdm(range(EPOCHS), desc='EPOCH', ascii=True, miniters=int(EPOCHS/5))
+    progress_bar = tqdm(range(EPOCHS), desc='EPOCH', ascii=True, dynamic_ncols=False, miniters=int(EPOCHS/5))
     for epoch_number in progress_bar:
         avg_loss, count = train_one_epoch(model, optimizer, loss_func, training_loader, beta, count, T)
         if save_progress is not None:
@@ -85,7 +85,7 @@ def test_run_point(testset, model, BATCH_SIZE):
 
     prediction = []
 
-    # for x in tqdm(testloader, desc='TEST', total=len_test, ascii=True, miniters=int(len_test/5)):
+    # for x in tqdm(testloader, desc='TEST', total=len_test, ascii=True, dynamic_cols=False, miniters=int(len_test/5)):
     for x in testloader:
         p = model(x, 0)
 

@@ -63,7 +63,7 @@ def inference_model(models, dataset, para, batch=8):
     nb = len(dataset)
     cut = list(range(0, nb, 400*batch)) + [nb]
     
-    for i in tqdm(range(len(cut)-1), desc='TEST', ascii=True, mininterval=int(len(cut)/5)):
+    for i in tqdm(range(len(cut)-1), desc='TEST', ascii=True, dynamic_ncols=False, mininterval=int(len(cut)/5)):
         ind = list(range(cut[i], cut[i+1]))
         testset = torch.utils.data.Subset(dataset, ind)
         loader = DataLoader(testset, batch_size=batch, shuffle=False)

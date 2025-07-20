@@ -118,12 +118,12 @@ class spclt():
         # define a progress bar
         if n_epochs is not None:
             if verbose:
-                progress_bar = tqdm(range(n_epochs), desc=f'Train {name_data} epoch', ascii=True)
+                progress_bar = tqdm(range(n_epochs), desc=f'Train {name_data} epoch', ascii=True, dynamic_ncols=False, miniters=10)
             else:
                 progress_bar = range(n_epochs)
         elif n_iters is not None:
             if verbose:
-                progress_bar = tqdm(range(n_iters), desc=f'Train {name_data} iter', ascii=True)
+                progress_bar = tqdm(range(n_iters), desc=f'Train {name_data} iter', ascii=True, dynamic_ncols=False, miniters=100)
             else:
                 progress_bar = range(n_iters)
         else:

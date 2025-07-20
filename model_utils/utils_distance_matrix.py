@@ -52,7 +52,7 @@ def get_DTW(X_tr, multivariate=True):
                 dist_mat[i,j] = dist
                 dist_mat[j,i] = dist
     else:
-        progress_bar = tqdm(range(N), desc=desc, ascii=True, miniters=int(N/10))
+        progress_bar = tqdm(range(N), desc=desc, ascii=True, dynamic_ncols=False,miniters=int(N/10))
         dist_rows = Parallel(n_jobs=-1)(delayed(parallel_dtw)(i, X_tr, N) for i in progress_bar)
         dist_mat_upper = np.array(dist_rows)
         dist_mat = dist_mat_upper + dist_mat_upper.T
@@ -112,7 +112,7 @@ def get_TAM(X_tr, multivariate=False):
                 dist_mat[i,j] = dist
                 dist_mat[j,i] = dist
     else:
-        progress_bar = tqdm(range(N), desc=desc, ascii=True, miniters=int(N/10))
+        progress_bar = tqdm(range(N), desc=desc, ascii=True, dynamic_ncols=False, miniters=int(N/10))
         dist_rows = Parallel(n_jobs=-1)(delayed(parallel_tam)(i, X_tr, N) for i in progress_bar)
         dist_mat_upper = np.array(dist_rows)
         dist_mat = dist_mat_upper + dist_mat_upper.T

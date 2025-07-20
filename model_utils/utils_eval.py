@@ -46,7 +46,7 @@ class Multi_Evaluation:
             sample_count = 0
             dist_mat_measure = {'local_distmat_rmse': 0}
             if verbose:
-                progress_bar = tqdm(sample_indices, desc='Local Evaluation', ascii=True, miniters=5)
+                progress_bar = tqdm(sample_indices, desc='Local Evaluation', ascii=True, dynamic_ncols=False, miniters=5)
             else:
                 progress_bar = sample_indices
             for sample_index in progress_bar:

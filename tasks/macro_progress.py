@@ -163,7 +163,7 @@ def main(args):
         progress_list = sorted(progress_list, key=lambda x: int(x.split('ckpt_')[1].split('.pth')[0]))
         initial_file_saved_time = os.path.getmtime(progress_list[0])
         epoch_indecies = [int(epoch_path.split('ckpt_')[1].split('.pth')[0]) for epoch_path in progress_list]
-        for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, miniters=10, total=len(progress_list)):
+        for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, dynamic_ncols=False,miniters=10, total=len(progress_list)):
             if eval_results.loc[(model_type, epoch_index), 'mae'] > 0 and args.prediction_model != 'DGCN':
                 print(f'--- {model_type}-{epoch_index} has been evaluated, skipping evaluation ---')
                 continue

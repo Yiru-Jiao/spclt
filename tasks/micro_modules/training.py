@@ -74,7 +74,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
     training_loader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
 
     EPOCHS = epochs
-    progress_bar = tqdm(range(EPOCHS), desc='EPOCH', ascii=True, miniters=int(EPOCHS/5))
+    progress_bar = tqdm(range(EPOCHS), desc='EPOCH', ascii=True, dynamic_ncols=False, miniters=int(EPOCHS/5))
 
     vloss_log = np.zeros(EPOCHS+4)
     vloss_log[:4] = [100, 99, 98, 97]
