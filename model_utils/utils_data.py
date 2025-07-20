@@ -11,22 +11,14 @@ from model_utils.utils_traffic_data import get_AMS_dataset, get_INT_dataset
 from sklearn.preprocessing import StandardScaler
 
 
-def set_nan_to_zero(a):
-    a[np.isnan(a)] = 0
-    return a
-
-
 def normalize_TS(TS):
-    TS = set_nan_to_zero(TS)
-    if TS.ndim == 2: # univariate
-        TS_max = TS.max(axis = 1).reshape(-1,1)
-        TS_min = TS.min(axis = 1).reshape(-1,1)
-        TS = (TS - TS_min)/(TS_max - TS_min + (1e-6))
-    elif TS.ndim == 3: # multivariate
-        N, D, L = TS.shape
-        TS_max = TS.max(axis=2).reshape(N,D,1) 
-        TS_min = TS.min(axis=2).reshape(N,D,1)
-        TS = (TS - TS_min) / (TS_max - TS_min + (1e-6))
+    """
+    Normalize time series data to the range [0, 1] for each feature.
+    """
+    TS_max = np.where(np.isnan(TS), -np.inf, TS).max(axis=0, keepdims=True)
+    TS_min = np.where(np.isnan(TS), np.inf, TS).min(axis=0, keepdims=True)
+    TS_range = TS_max - TS_min
+    TS = (TS - TS_min) / np.where(TS_range < 1e-6, 1, TS_range)
     return TS
 
 
@@ -41,20 +33,23 @@ def compute_sim_mat(data, dist_metric='EUC'):
         else:
             multivariate = True
         norm_TS = normalize_TS(data)
+        norm_TS = np.where(np.isnan(norm_TS), 0, norm_TS)  # set NaN values to zero
         sim_mat = save_sim_mat(norm_TS, multivariate, dist_metric)
     elif data.ndim == 4: 
         """
         MacroTraffic (n_instance, n_timestamps, n_nodes, n_features)
         MicroTraffic (n_instance, n_agents, n_timestamps, n_features)
         """
-        if data.shape[1] == 26: # MicroTraffic, transpose to (n_instance, n_timestamps, n_agents, n_features)
-            data = data.transpose(0, 2, 1, 3)
+        if data.shape[1] == 26: # MicroTraffic, transpose to (n_instance, n_timestamps, n_features, n_agents)
+            data = data.transpose(0, 2, 3, 1)
+        if data.shape[2] == 193: # MacroTraffic, transpose to (n_instance, n_timestamps, n_features, n_nodes)
+            data = data.transpose(0, 1, 3, 2)
         if data.shape[3] == 1:
             data = data.reshape(data.shape[0], data.shape[1], -1)
             sim_mat = compute_sim_mat(data, dist_metric)
         else:
             sim_mat = np.zeros((data.shape[0], data.shape[0]))
-            for channel_idx in range(data.shape[3]):
+            for channel_idx in range(data.shape[3]): # iterate over agent or node dimension
                 sim_mat += compute_sim_mat(data[..., channel_idx], dist_metric)
             sim_mat /= data.shape[3]
     return sim_mat

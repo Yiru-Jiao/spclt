@@ -8,15 +8,16 @@ from tqdm import tqdm
 import numpy as np
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.measures import MeasureCalculator
-from model_utils.utils_data import get_sim_mat
-from model_utils.utils_distance_matrix import get_EUC, get_DTW
+from model_utils.utils_data import get_sim_mat, compute_sim_mat, normalize_TS
+from model_utils.utils_distance_matrix import get_EUC
 
 
 class Multi_Evaluation:
     def __init__(self, loader, dataset, data, latent):
         self.loader = loader
         self.dataset = dataset
-        self.data = data
+        self.sim_mat_X = get_sim_mat(self.loader, data, self.dataset, dist_metric='EUC', prefix='test')
+        self.data = normalize_TS(data)
         self.latent = latent
 
     def define_ks(self, dist_mat_X):
@@ -83,9 +84,8 @@ class Multi_Evaluation:
                 dep_measures = {'local_'+key: value/sample_count for key, value in dep_measures_list.items()}
                 results = {**dist_mat_measure, **dep_measures}
         else:
-            sim_mat_X = get_sim_mat(self.loader, self.data, self.dataset, dist_metric='EUC', prefix='test')
-            sim_mat_X = abs((sim_mat_X - sim_mat_X.min()) / (sim_mat_X.max() - sim_mat_X.min()))
-            dist_mat_X = abs(1 - sim_mat_X)
+            dist_mat_X = abs(1 - self.sim_mat_X)
+            dist_mat_X = abs((dist_mat_X - dist_mat_X.min()) / (dist_mat_X.max() - dist_mat_X.min()))
             dist_mat_Z = get_EUC(self.latent.reshape(self.latent.shape[0], -1))
             dist_mat_Z = abs((dist_mat_Z - dist_mat_Z.min()) / (dist_mat_Z.max() - dist_mat_Z.min()))
 

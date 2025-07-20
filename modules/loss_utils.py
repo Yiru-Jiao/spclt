@@ -75,12 +75,23 @@ def timelag_sigmoid(z1, sigma=1):
 ## functions and classes for topology preserving regularizer ##
 ###############################################################
 
+def tensor_norm_ts(TS):
+    """
+    Normalize a time series tensor per feature.
+    """
+    TS_max, _ = torch.max(TS, dim=0, keepdim=True)
+    TS_min, _ = torch.min(TS, dim=0, keepdim=True)
+    TS_range = TS_max - TS_min
+    TS = (TS - TS_min) / torch.where(TS_range < 1e-6, torch.ones_like(TS_range), TS_range)
+    return TS
+
+
 def topo_euclidean_distance_matrix(x, p=2):
     """
     Computes the pairwise Euclidean distance matrix between the rows of a 2D tensor.
     """
+    x = tensor_norm_ts(x)
     x_flat = x.view(x.size(0), -1)
-    x_flat[torch.isnan(x_flat)] = 0
     distances = torch.norm(x_flat[:, None] - x_flat, dim=2, p=p)
     return distances
 
@@ -235,6 +246,8 @@ def get_laplacian(X, bandwidth=50): # bandwidth tuning should increase exponenti
     """
     Calculate the Normalized Graph Laplacian for a given set of data points.
     """
+    X = tensor_norm_ts(X)
+
     if X.ndim == 3:
         B, N, _ = X.shape
     elif X.ndim == 4:
@@ -242,7 +255,6 @@ def get_laplacian(X, bandwidth=50): # bandwidth tuning should increase exponenti
         B, N, _ = X.shape                                 # use N as the number of timesteps for MicroTraffic
     c = 1/4
 
-    X[torch.isnan(X)] = 0
     dist_XX = torch.cdist(X, X, p=2)
     K = torch.exp(-dist_XX**2 / bandwidth)
     d_i = K.sum(dim=1)
