@@ -15,25 +15,12 @@ import argparse
 
 import torch
 from model import spclt
-import model_utils.utils_data as datautils
-from model_utils.utils_general import *
-from tasks.classification import eval_classification
-from tasks.clustering import eval_clustering
-from tasks.paramsearch import *
-from model_utils.utils_eval import *
-
-sys.path.append('traffic_tasks')
-from micro_modules.interaction_model import UQnet
-from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
-from micro_modules.utils import *
-from micro_modules.train import *
-from micro_modules.interaction_dataset import *
-from micro_modules.losses import *
-from macro_modules.models import DGCN, MSE_scale
-from macro_modules.utils import *
-from macro_modules.training import *
-from macro_modules.custom_dataset import *
-import utils_pretrain as utils_pre
+import model_utils as model_utils
+import model_utils.utils_general
+import modules as modules
+import tasks.macro_modules as macro_modules
+import tasks.micro_modules as micro_modules
+import tasks.task_utils as task_utils
 
 
 def main():
@@ -45,7 +32,7 @@ def main():
         print(f'--- Cuda device count: {torch.cuda.device_count()}, Cuda device name: {torch.cuda.get_device_name()}, Cuda version: {torch.version.cuda}, Cudnn version: {torch.backends.cudnn.version()} ---')
     print(f'--- Pytorch version: {torch.__version__}, Available threads: {os.cpu_count()} ---')
     
-    fix_seed(131, deterministic=True)  # Below random values in comments are results in the author's machine
+    model_utils.utils_general.fix_seed(131, deterministic=True)  # Below random values in comments are results in the author's machine
     print('Random seed fixed to be 131, testing...')
     print('Python random test:', random.random()) # 0.3154351888034451
     print('Numpy random test:', np.random.rand()) # 0.7809038987924661
