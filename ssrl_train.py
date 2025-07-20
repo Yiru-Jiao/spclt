@@ -34,6 +34,7 @@ def parse_args():
     args.tau_temp = 0
     args.temporal_hierarchy = None
     args.regularizer = None
+    args.baseline = False
     args.bandwidth = 1.
     args.iters = None
     args.epochs = 100
@@ -82,7 +83,11 @@ def main(args):
         raise ValueError(f"Unknown dataset loader: {args.loader}")
 
     # Initialize evaluation dataframe for training efficiency
-    model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.loader == 'UEA':
+        model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
+                      'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
+    else:
+        model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
 
     def read_saved_results():
         eval_results = pd.read_csv(results_dir)
@@ -142,18 +147,24 @@ def main(args):
 
         # Iterate over different losses
         for model_type in model_list:
-            if args.loader == 'UEA':
-                if eval_results.loc[(model_type, dataset), 'training_time'] > 0:
-                    final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
-                    if final_epoch[-2:] != '00':
-                        print(f'--- {model_type} {dataset} has been evaluated (not 00), skipping evaluation ---')
-                        continue
-                    elif int(final_epoch) == args.epochs:
-                        print(f'--- {model_type} {dataset} has been trained (==epochs), skipping evaluation ---')
-                        continue
+            # if args.loader == 'UEA':
+            #     if eval_results.loc[(model_type, dataset), 'training_time'] > 0:
+            #         final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
+            #         if final_epoch[-2:] != '00':
+            #             print(f'--- {model_type} {dataset} has been evaluated (not 00), skipping evaluation ---')
+            #             continue
+            #         elif int(final_epoch) == args.epochs:
+            #             print(f'--- {model_type} {dataset} has been trained (==epochs), skipping evaluation ---')
+            #             continue
             # Set hyperparameters and configure model
+            if 'baseline' in model_type:
+                args.baseline = True
+                para2load = model_type.split('-base')[0]
+            else:
+                args.baseline = False
+                para2load = model_type
             try:
-                args = load_tuned_hyperparameters(args, tuned_params, model_type)
+                args = load_tuned_hyperparameters(args, tuned_params, para2load)
             except:
                 print(f'****** {model_type} hyperparameters not found ******')
                 continue
@@ -195,7 +206,7 @@ def main(args):
                 existing_models.sort(key=os.path.getmtime, reverse=True)
                 for model_epoch in existing_models[1:]:
                     os.remove(model_epoch)
-                    if model_type in ['topo-ts2vec', 'ggeo-ts2vec', 'topo-softclt', 'ggeo-softclt']:
+                    if not model_type in ['ts2vec', 'softclt']:
                         os.remove(model_epoch.replace('_net.pth', '_loss_log_vars.npy'))
             best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
 

@@ -68,6 +68,9 @@ class spclt():
             self.loss_log_vars = torch.nn.Parameter(torch.zeros(3, device=self.device))
         elif self.regularizer_config['reserve'] in ['topology', 'geometry']:
             self.loss_log_vars = torch.nn.Parameter(torch.zeros(2, device=self.device))
+        if self.regularizer_config['baseline']:
+            # let log(sigma^2) = 0, i.e., exp(-log(sigma^2)) = 1 and thus coefficient = 0.5
+            self.loss_log_vars = torch.zeros(2, device=self.device, requires_grad=False)
         
         # define callback functions
         self.after_iter_callback = after_iter_callback
@@ -82,13 +85,13 @@ class spclt():
             self.loss_log_vars.requires_grad = False
 
     def train(self,):
-        if self.regularizer_config['reserve'] is None:
+        if self.regularizer_config['reserve'] is None or self.regularizer_config['baseline']:
             self.net.train()
         else:
             self.net.train()
             self.loss_log_vars.requires_grad = True
 
-
+    # define fit() function
     def fit(self, name_data, train_data, soft_assignments=None, n_epochs=None, n_iters=None, scheduler='constant', verbose=0):
         """
         Fit the model to the training data.
@@ -128,7 +131,7 @@ class spclt():
         
         # define optimizer
         self.optimizer = torch.optim.AdamW(self.net.parameters(), lr=self.lr)
-        if self.regularizer_config['reserve'] is not None:
+        if self.regularizer_config['reserve'] in ['topology', 'geometry', 'both']:
             self.optimizer_weight = torch.optim.AdamW([self.loss_log_vars], lr=self.weight_lr)
             def optimizer_zero_grad():
                 self.optimizer.zero_grad()
@@ -211,7 +214,7 @@ class spclt():
                 threshold=1e-3, threshold_mode='rel', min_lr=self.lr*0.6**15
                 )
             
-            if self.regularizer_config['reserve'] is not None:
+            if self.regularizer_config['reserve'] is not None and not self.regularizer_config['baseline']:
                 self.scheduler_weight = torch.optim.lr_scheduler.ReduceLROnPlateau(
                     self.optimizer_weight, mode='min', factor=0.6, patience=patience, cooldown=cool_down_weight,
                     threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*0.6**15
@@ -628,3 +631,5 @@ class spclt():
             state_loss_log_vars = np.load(fn+'_loss_log_vars.npy')
             state_loss_log_vars = torch.from_numpy(state_loss_log_vars).to(self.device)
             self.loss_log_vars = torch.nn.Parameter(state_loss_log_vars, requires_grad=False)
+        if self.regularizer_config['baseline']:
+            self.loss_log_vars = torch.zeros(2, device=self.device, requires_grad=False)

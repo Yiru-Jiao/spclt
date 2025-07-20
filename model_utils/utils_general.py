@@ -133,7 +133,7 @@ def load_tuned_hyperparameters(args, tuned_params, model_type=None):
                 model_type = 'topo-softclt'
             elif args.regularizer == 'geometry':
                 model_type = 'ggeo-softclt'
-    if model_type == 'ts2vec':
+    elif model_type == 'ts2vec':
         param_names = ['batch_size']
         args = get_tuned_params(args, tuned_params, 'TS2Vec_Phase1', param_names)
         args.regularizer = None
@@ -171,6 +171,7 @@ def configure_model(args, input_dims, device):
     # Define regularizer configuration
     regularizer_config = dict(
         reserve=args.regularizer,
+        baseline=args.baseline,
         bandwidth=args.bandwidth,
     )
 
