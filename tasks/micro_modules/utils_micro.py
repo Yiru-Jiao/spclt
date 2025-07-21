@@ -139,14 +139,12 @@ def ModalSampling(H, paralist, r=2, k=10):
         Y[i] = y
     return Y
 
-def ComputeError(Yp, Y, r_list=[2], sh=6):
+def ComputeFDE(Yp, Y, r_list=[2], sh=6):
     assert sh <= Yp.shape[1]
     # Yp = [N,k,2], Y = [N,2] # k is the number of heatmap samples for each position to be predicted, k=10
     # Ua = [N], Ue = [N]
     E = np.abs(Yp.transpose((1,0,2))-Y) #(k,N,2)
     DE = np.sqrt(E[:sh,:,0]**2+E[:sh,:,1]**2) #(k,N)
-    # print("minFDE:", np.mean(FDE),"m")
-    # print("minMR:", np.mean(MR)*100,"%")
     minFDE = np.min(DE, axis=0) #(N,)
     MR_list = []
     for r in r_list:
@@ -154,3 +152,16 @@ def ComputeError(Yp, Y, r_list=[2], sh=6):
         MR_list.append(minMR)
 
     return np.mean(minFDE), [np.mean(MR)*100 for MR in MR_list] # MR (%) FDE (m)
+
+
+def ComputeError(Yp, Y, r_list=[2], sh=6, n_fold=20):
+    # Bootstrap evaluation
+    metric_list = np.zeros((n_fold, 1+len(r_list)))
+    for i in range(n_fold):
+        indicies = np.random.choice(len(Y), len(Y)//n_fold, replace=True)
+        Yp_fold = Yp[indicies]
+        Y_fold = Y[indicies]
+        metric_list[i, 0], metric_list[i, 1:] = ComputeFDE(Yp_fold, Y_fold, r_list=r_list, sh=sh)
+    metric_mean = np.mean(metric_list, axis=0)
+    metric_std = np.std(metric_list, axis=0)
+    return metric_mean, metric_std

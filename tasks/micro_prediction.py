@@ -158,8 +158,11 @@ def main(args):
         Yp, Ua, Ue, Y = inference_model([model], testset, paralist)
 
         # Prediction evaluation
-        min_fde, mr_list = ComputeError(Yp, Y, r_list=[0.5,1.,2.], sh=6) # r is the radius of error in meters
-        pred_results = {'min_fde': min_fde, 'mr_05': mr_list[0], 'mr_1': mr_list[1], 'mr_2': mr_list[2]}
+        metric_mean, metric_std = ComputeError(Yp, Y, r_list=[0.5,1.,2.], sh=6) # r is the radius of error in meters
+        pred_results = {'min_fde_mean': metric_mean[0], 'min_fde_std': metric_std[0],
+                        'mr_05_mean': metric_mean[1], 'mr_05_std': metric_std[1],
+                        'mr_1_mean': metric_mean[2], 'mr_1_std': metric_std[2],
+                        'mr_2_mean': metric_mean[3], 'mr_2_std': metric_std[3]}
 
         # Encoding evaluation
         _, _, test_data = load_MicroTraffic(train_set, dataset_dir='./datasets')

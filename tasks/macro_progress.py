@@ -182,10 +182,29 @@ def main(args):
             ## Prediction evaluation, scale back to original values (km/h)
             prediction = prediction[...,0]*130 # (N, 15, 193, 1)
             X = testset.X[:,-15:,:,0]*130 # (N, 15, 193, 1)
-            pred_results = {'mae': np.mean(np.abs(prediction-X)),
-                            'rmse': np.mean((prediction-X)**2)**0.5,
-                            'error_std': np.std(prediction-X),
-                            'explained_variance': 1-np.var(prediction-X)/np.var(X)}
+
+            ## Bootstrap evaluation
+            n_fold = 20
+            mae_list = np.zeros(n_fold, dtype=np.float32)
+            rmse_list = np.zeros(n_fold, dtype=np.float32)
+            error_std_list = np.zeros(n_fold, dtype=np.float32)
+            explained_variance_list = np.zeros(n_fold, dtype=np.float32)
+            for i in range(n_fold):
+                indices = np.random.choice(len(prediction), size=len(prediction)//n_fold, replace=True)
+                pred = prediction[indices]
+                x = X[indices]
+                mae_list[i] = np.mean(np.abs(pred - x))
+                rmse_list[i] = np.mean((pred - x)**2)**0.5
+                error_std_list[i] = np.std(pred - x)
+                explained_variance_list[i] = 1 - np.var(pred - x) / np.var(x)
+            pred_results = {'mae (mean)': np.mean(mae_list),
+                            'mae (std)': np.std(mae_list),
+                            'rmse (mean)': np.mean(rmse_list),
+                            'rmse (std)': np.std(rmse_list),
+                            'error_std (mean)': np.mean(error_std_list),
+                            'error_std (std)': np.std(error_std_list),
+                            'explained_variance (mean)': np.mean(explained_variance_list),
+                            'explained_variance (std)': np.std(explained_variance_list)}
 
             ## Encoding evaluation
             test_labels = np.zeros(test_data.shape[0])
