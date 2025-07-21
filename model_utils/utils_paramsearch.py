@@ -86,8 +86,11 @@ class trainer():
             selected_indices = indexed_sim_mat[:,0].reshape(-1).astype(int)
             sim_mat = indexed_sim_mat[:,-self.original_size:][:,selected_indices]
         soft_assignments = datautils.assign_soft_labels(sim_mat, self.tau_inst)
-        return -self.encoder.compute_loss(test_data, soft_assignments, non_regularized=True)
-    
+        score = -self.encoder.compute_loss(test_data, soft_assignments, non_regularized=True)
+        del self.encoder
+        del soft_assignments
+        torch.cuda.empty_cache()
+        return score
 
 def grid_search(params, loader, dataset, dist_metric, 
                 train_data, indexed_sim_mat, n_fold, n_jobs, fit_config):

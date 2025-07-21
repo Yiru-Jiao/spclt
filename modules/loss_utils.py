@@ -282,11 +282,11 @@ def get_JGinvJT(L, Y, k_chunk=512):
     B, N, n = Y.shape
     device  = Y.device
 
-    # Pre‑compute LY once
+    # Pre-compute LY once
     LY = torch.matmul(L, Y)                      # (B,N,n)
     H_tilde = torch.zeros(B, N, n, n, dtype=Y.dtype, device=device)
 
-    # First term: Σ_k L_{ik}·Y_kY_kᵀ  (done in k‑sized slices)
+    # First term: Σ_k L_{ik}·Y_kY_kᵀ  (done in k-sized slices)
     for k0 in range(0, N, k_chunk):
         k1 = min(k0 + k_chunk, N)
         L_blk = L[:, :, k0:k1]                   # (B,N,k)
@@ -295,24 +295,23 @@ def get_JGinvJT(L, Y, k_chunk=512):
         # use distinct letters: i = node, p/q = latent dims
         # (B,N,k)·(B,k,n)·(B,k,n) → (B,N,n,n)
         term1_blk = torch.einsum(
-            'bik,bkp,bkq->bipq',                # no optimise kw‑arg – works on any version
+            'bik,bkp,bkq->bipq',                # no optimise kw-arg – works on any version
             L_blk, Y_blk, Y_blk
         )
-        H_tilde.add_(term1_blk)                 # in‑place accumulate keeps memory flat
+        H_tilde.add_(term1_blk)                 # in-place accumulate keeps memory flat
 
     # Second & third terms
     Y_col = Y.unsqueeze(-1)                     # (B,N,n,1)
     LY_row = LY.unsqueeze(-2)                   # (B,N,1,n)
 
-    H_tilde.mul_(0.5)                           # apply ½ to term‑1
+    H_tilde.mul_(0.5)                           # apply ½ to term-1
     H_tilde.add_(
-        -0.5 * (Y_col * LY_row +                # term‑2
-                Y_col.transpose(-1, -2) *       # term‑3
+        -0.5 * (Y_col * LY_row +                # term-2
+                Y_col.transpose(-1, -2) *       # term-3
                 LY_row.transpose(-1, -2))
     )
 
     return H_tilde
-
 
 
 def relaxed_distortion_measure_JGinvJT(H):
@@ -321,7 +320,75 @@ def relaxed_distortion_measure_JGinvJT(H):
     """
     TrH = H.diagonal(offset=0, dim1=-1, dim2=-2).sum(-1)
     TrH2 = (H @ H).diagonal(offset=0, dim1=-1, dim2=-2).sum(-1)
+    n = H.size(-1)
 
-    distortion = (TrH2).mean() - 2 * (TrH).mean()
-    return distortion
+    distortion = (TrH2).mean() - 2 * (TrH).mean() + n
+    return distortion / n
 
+
+def iso_loss_stream(L, Y, node_chunk=128, k_chunk=512):
+    """
+    Computes the relaxed distortion measure without ever materialising H̃.
+
+    Parameters
+    ----------
+    L : (B, N, N)   normalised Laplacian
+    Y : (B, N, n)   latent vectors
+    node_chunk :    how many 'i'-nodes to process at once  (memory–speed trade-off)
+    k_chunk   :     how many 'k'-columns of L to load at once (as before)
+    dtype      :    optional (float16 / bfloat16) down-cast for extra savings
+
+    Returns
+    -------
+    distortion : scalar tensor on the same device
+    """
+
+    B, N, n = Y.shape
+    device  = Y.device
+    LY      = torch.matmul(L, Y)                     # (B,N,n)
+
+    # running sums for TrH   and TrH²
+    sum_tr  = torch.zeros(B, device=device, dtype=Y.dtype)
+    sum_fro = torch.zeros(B, device=device, dtype=Y.dtype)
+
+    for i0 in range(0, N, node_chunk):
+        i1 = min(i0 + node_chunk, N)
+
+        # ── term-1: Σ_k  L_{ik} · Y_k Y_kᵀ   (chunk in k)
+        # we build it for node-block (B, i_block, n, n)
+        H_blk = torch.zeros(B, i1 - i0, n, n, device=device, dtype=Y.dtype)
+
+        for k0 in range(0, N, k_chunk):
+            k1    = min(k0 + k_chunk, N)
+            L_ik  = L[:, i0:i1, k0:k1]              # (B, i, k)
+            Y_k   = Y[:, k0:k1, :]                  # (B, k, n)
+
+            # einsum: (B,i,k) · (B,k,p) · (B,k,q)  →  (B,i,p,q)
+            H_blk.add_(torch.einsum('bik,bkp,bkq->bipq', L_ik, Y_k, Y_k))
+
+        # ── term-2, term-3 (cheap, no loop over k) ──────────────────
+        Y_i  = Y[:, i0:i1, :]                       # (B,i,n)
+        LY_i = LY[:, i0:i1, :]                      # (B,i,n)
+
+        H_blk.mul_(0.5)
+        H_blk.add_(
+            -0.5 * (
+                Y_i.unsqueeze(-1)  * LY_i.unsqueeze(-2) +
+                LY_i.unsqueeze(-1) * Y_i.unsqueeze(-2)
+            )
+        )
+
+        # ── accumulate statistics we really need ────────────────────
+        tr  = H_blk.diagonal(offset=0, dim1=-1, dim2=-2).sum(-1)   # (B,i)
+        fro = (H_blk * H_blk).sum((-1, -2))                        # (B,i)
+
+        sum_tr  += tr.sum(dim=1)
+        sum_fro += fro.sum(dim=1)
+
+        # free the block ASAP
+        del H_blk, tr, fro
+        torch.cuda.empty_cache()            # keeps long runs flat
+
+    # final distortion  =  E_i[TrH²] - 2·E_i[TrH] + n
+    distortion = sum_fro.mean() / N  -  2 * (sum_tr.mean() / N) + n
+    return distortion / n
