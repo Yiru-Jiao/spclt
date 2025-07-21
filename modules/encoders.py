@@ -108,8 +108,8 @@ class TSEncoder(nn.Module):
         self.repr_dropout = nn.Dropout(p=0.1)
         
     def forward(self, x, mask=None):
-        nan_mask = torch.isnan(x).any(axis=-1)
-        x = torch.where(nan_mask, torch.zeros_like(x), x)
+        nan_mask = ~torch.isnan(x).any(axis=-1)
+        x[~nan_mask] = 0
         x = self.input_fc(x)  # B x T x Ch
         
         # generate & apply mask

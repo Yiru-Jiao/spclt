@@ -149,15 +149,6 @@ def main(args):
 
         # Iterate over different losses
         for model_type in model_list:
-            # if args.loader == 'UEA':
-            #     if eval_results.loc[(model_type, dataset), 'training_time'] > 0:
-            #         final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
-            #         if final_epoch[-2:] != '00':
-            #             print(f'--- {model_type} {dataset} has been evaluated (not 00), skipping evaluation ---')
-            #             continue
-            #         elif int(final_epoch) == args.epochs:
-            #             print(f'--- {model_type} {dataset} has been trained (==epochs), skipping evaluation ---')
-            #             continue
             # Set hyperparameters and configure model
             if 'baseline' in model_type:
                 args.baseline = True

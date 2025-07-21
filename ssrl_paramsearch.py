@@ -49,6 +49,7 @@ def parse_args():
     parser.add_argument('--n_jobs', type=int, default=-1, help='The number of parallel jobs to run for grid search (defaults to -1 for all available cores)')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
+    parser.add_argument('--reverse_list', type=int, default=0, help='Whether to reverse the list of datasets (defaults to False)')
     args = parser.parse_args()
     args.reproduction = bool(args.reproduction)
     return args
@@ -115,6 +116,8 @@ def main(args):
         dataset_dir = os.path.join('datasets/', args.loader)
         dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
         dataset_list.sort()
+        if args.reverse_list:
+            dataset_list = dataset_list[::-1]
     elif 'Macro' in args.loader:
         dataset_list = [['2019']]
     elif args.loader == 'MicroTraffic':
