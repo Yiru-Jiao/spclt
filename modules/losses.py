@@ -175,12 +175,8 @@ def geo_loss(model, x, bandwidth):
         x = x.permute(0, 2, 1, 3)
     
     L = get_laplacian(x, bandwidth=bandwidth)
-    if latent.size(1) < 4000:
-        H_tilde = get_JGinvJT(L, latent)
-        n = H_tilde.size(-1)
-        distortion = relaxed_distortion_measure_JGinvJT(H_tilde)
-    else:
-        distortion, n = iso_loss_stream(L, latent)
-    # Normalize distortion according
-    iso_loss = (distortion + n) / n
+    distortion, n = relaxed_distortion_measure_JGinvJT(L, latent)
+
+    # Normalize distortion
+    iso_loss = distortion / n + 1.
     return iso_loss
