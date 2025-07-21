@@ -320,10 +320,9 @@ def relaxed_distortion_measure_JGinvJT(H):
     """
     TrH = H.diagonal(offset=0, dim1=-1, dim2=-2).sum(-1)
     TrH2 = (H @ H).diagonal(offset=0, dim1=-1, dim2=-2).sum(-1)
-    n = H.size(-1)
 
-    distortion = (TrH2).mean() - 2 * (TrH).mean() + n
-    return distortion / n
+    distortion = (TrH2).mean() - 2 * (TrH).mean()
+    return distortion
 
 
 def iso_loss_stream(L, Y, node_chunk=128, k_chunk=512):
@@ -389,6 +388,6 @@ def iso_loss_stream(L, Y, node_chunk=128, k_chunk=512):
         del H_blk, tr, fro
         torch.cuda.empty_cache()            # keeps long runs flat
 
-    # final distortion  =  E_i[TrH²] - 2·E_i[TrH] + n
-    distortion = sum_fro.mean() / N  -  2 * (sum_tr.mean() / N) + n
-    return distortion / n
+    # final distortion  =  E_i[TrH²] - 2·E_i[TrH]
+    distortion = sum_fro.mean() / N  -  2 * (sum_tr.mean() / N)
+    return distortion, n

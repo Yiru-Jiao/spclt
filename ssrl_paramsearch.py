@@ -173,7 +173,7 @@ def main(args):
         search_space = {'tau_inst': [1, 3, 5, 10, 20], # used in softclt study
                         'tau_temp': [0.5, 1., 1.5, 2., 2.5], # used in softclt study
                         'temporal_hierarchy': [None, 'linear', 'exponential'],
-                        'bandwidth': [0.01, 0.25, 1., 9., 25.], # used in geometry regularizer only
+                        'bandwidth': [0.25, 1., 4., 9., 25.], # used in geometry regularizer only
                         'batch_size': [2**i for i in range(3, max(4, min(6, max_batch_size)))], # 8, 16, 32
                         'weight_lr': [0.01, 0.05]}
         print(f"--- batch_size search space: {search_space['batch_size']} ---")
