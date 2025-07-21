@@ -268,24 +268,51 @@ def get_laplacian(X, bandwidth=50): # bandwidth tuning should increase exponenti
     return L # (B, N, N) or (B, T, T)
 
 
-def get_JGinvJT(L, Y):
+def get_JGinvJT(L, Y, k_chunk=512):
     """
-    Calculate the JGinvJT matrix for each data point with improved memory efficiency.
-    Instead of forming full outer product intermediates, we use torch.einsum to directly compute
-    the required contractions.
-    """
-    # Compute L_mul_Y for later use (shape: [Batch, N, n])
-    L_mul_Y = torch.matmul(L, Y)
+    Memory-efficient computation of  H̃ = ½·(L·Y_kY_kᵀ - Y·(LY)ᵀ - (LY)·Yᵀ)
 
-    # term1[b,i,j,k] = sum_{l} L[b,i,l] * Y[b,l,j] * Y[b,l,k]
-    term1 = torch.einsum("bil,blj,blk->bijk", L, Y, Y)
-    # term2[b,i,j,k] = Y[b,i,j] * L_mul_Y[b,i,k]
-    term2 = torch.einsum("bij,bik->bijk", Y, L_mul_Y)
-    # term3[b,i,j,k] = Y[b,i,k] * L_mul_Y[b,i,j]
-    term3 = torch.einsum("bik,bij->bijk", Y, L_mul_Y)
-    H_tilde = 0.5 * (term1 - term2 - term3)
+    Shapes
+    ------
+    L : (B, N, N)
+    Y : (B, N, n)
+    Returns  (B, N, n, n)
+    """
+
+    B, N, n = Y.shape
+    device  = Y.device
+
+    # Pre‑compute LY once
+    LY = torch.matmul(L, Y)                      # (B,N,n)
+    H_tilde = torch.zeros(B, N, n, n, dtype=Y.dtype, device=device)
+
+    # First term: Σ_k L_{ik}·Y_kY_kᵀ  (done in k‑sized slices)
+    for k0 in range(0, N, k_chunk):
+        k1 = min(k0 + k_chunk, N)
+        L_blk = L[:, :, k0:k1]                   # (B,N,k)
+        Y_blk = Y[:, k0:k1, :]                   # (B,k,n)
+
+        # use distinct letters: i = node, p/q = latent dims
+        # (B,N,k)·(B,k,n)·(B,k,n) → (B,N,n,n)
+        term1_blk = torch.einsum(
+            'bik,bkp,bkq->bipq',                # no optimise kw‑arg – works on any version
+            L_blk, Y_blk, Y_blk
+        )
+        H_tilde.add_(term1_blk)                 # in‑place accumulate keeps memory flat
+
+    # Second & third terms
+    Y_col = Y.unsqueeze(-1)                     # (B,N,n,1)
+    LY_row = LY.unsqueeze(-2)                   # (B,N,1,n)
+
+    H_tilde.mul_(0.5)                           # apply ½ to term‑1
+    H_tilde.add_(
+        -0.5 * (Y_col * LY_row +                # term‑2
+                Y_col.transpose(-1, -2) *       # term‑3
+                LY_row.transpose(-1, -2))
+    )
 
     return H_tilde
+
 
 
 def relaxed_distortion_measure_JGinvJT(H):
