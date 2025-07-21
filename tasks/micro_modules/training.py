@@ -112,7 +112,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
         vloss_log[4+epoch_number] = avg_vloss
         progress_bar.set_postfix({'loss': avg_loss, 'vloss': avg_vloss})
 
-        if np.all(abs(np.diff(vloss_log[epoch_number+2:epoch_number+5])/vloss_log[epoch_number+1:epoch_number+4])<5e-4):
+        if np.all(abs(np.diff(vloss_log[epoch_number:epoch_number+5])/vloss_log[epoch_number:epoch_number+4])<5e-4):
             print('Early stopping at epoch {} with vloss {}'.format(epoch_number, avg_vloss))
             break
     return epoch_number+1

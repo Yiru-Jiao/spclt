@@ -196,7 +196,7 @@ class spclt():
                     self.initial_cooldown_weight = 10
                     self.initial_cooldown_model = 5
                 elif self.loader == 'MicroTraffic':
-                    patience = 6
+                    patience = 4
                     self.initial_cooldown_weight = 4
                     self.initial_cooldown_model = 2
                 elif self.loader in ['MacroLSTM', 'MacroGRU']:
@@ -351,7 +351,7 @@ class spclt():
                 scheduler_step(val_loss_log, val_loss.item(), regularizer_loss.item())
                 self.train()
 
-                if np.all(abs(np.diff(val_loss_log[self.epoch_n+2:self.epoch_n+5, 0])/val_loss_log[self.epoch_n+1:self.epoch_n+4, 0]) < 5e-4):
+                if self.epoch_n>10 and np.all(abs(np.diff(val_loss_log[self.epoch_n:self.epoch_n+5, 0])/val_loss_log[self.epoch_n:self.epoch_n+4, 0]) < 5e-4):
                     Warning('Early stopping if validation loss converges.')
                     continue_training = False
                     break
@@ -364,7 +364,7 @@ class spclt():
             if n_epochs is not None and verbose:
                 avg_batch_loss = loss_log[self.epoch_n, 0]
                 if scheduler == 'reduced':
-                    avg_val_loss = val_loss_log[self.epoch_n+4, 0].mean()
+                    avg_val_loss = val_loss_log[self.epoch_n+4, 0]
                     current_lr = self.optimizer.param_groups[0]['lr']
                 if n_epochs % verbose == (verbose-1):
                     if scheduler == 'reduced':
@@ -399,12 +399,6 @@ class spclt():
         # create test dataset and dataloader
         val_dataset = datautils.custom_dataset(torch.from_numpy(val_data).float(), self.loader)
         val_loader = DataLoader(val_dataset, batch_size=min(self.batch_size, len(val_dataset)), shuffle=False, drop_last=True)
-        if self.regularizer_config['reserve'] is None:
-            val_loss_log = np.zeros((len(val_loader), 2)) * np.nan
-        elif self.regularizer_config['reserve'] == 'both':
-            val_loss_log = np.zeros((len(val_loader), 7)) * np.nan
-        elif self.regularizer_config['reserve'] in ['topology', 'geometry']:
-            val_loss_log = np.zeros((len(val_loader), 5)) * np.nan
 
         # define loss function
         self.loss_func = losses.combined_loss

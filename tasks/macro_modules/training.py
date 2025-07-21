@@ -51,7 +51,7 @@ def train_model(epochs, batch_size, trainset, model, optimizer, validation_loade
             progress_bar.set_postfix({'loss': avg_loss, 'vloss': avg_vloss})
             stop_early = False
             vloss_log[5+epoch_number] = avg_vloss
-            if np.all(abs(np.diff(vloss_log[epoch_number+3:epoch_number+6])/vloss_log[epoch_number+2:epoch_number+5])<5e-4):
+            if np.all(abs(np.diff(vloss_log[epoch_number+1:epoch_number+6])/vloss_log[epoch_number+1:epoch_number+5])<5e-4):
                 print('Early stopping at epoch', epoch_number, 'with validation loss', avg_vloss)
                 stop_early = True
         elif isinstance(scheduler, torch.optim.lr_scheduler.StepLR):

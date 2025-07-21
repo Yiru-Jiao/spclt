@@ -270,40 +270,20 @@ def get_laplacian(X, bandwidth=50): # bandwidth tuning should increase exponenti
 
 def get_JGinvJT(L, Y):
     """
-    Calculate the JGinvJT matrix for each data point.
-    """    
-    Batch, N, n = Y.shape
+    Calculate the JGinvJT matrix for each data point with improved memory efficiency.
+    Instead of forming full outer product intermediates, we use torch.einsum to directly compute
+    the required contractions.
+    """
+    # Compute L_mul_Y for later use (shape: [Batch, N, n])
+    L_mul_Y = torch.matmul(L, Y)
 
-    if N*n*n <= 1e6:
-        L_mul_Y = L @ Y
-
-        Y_expanded = Y.unsqueeze(-1)
-        YT_expanded = Y.unsqueeze(-2)
-
-        term1 = (L @ (Y_expanded * YT_expanded).view(Batch, N, n * n)).view(Batch, N, n, n)
-        term2 = Y_expanded * L_mul_Y.unsqueeze(-2)
-        term3 = YT_expanded * L_mul_Y.unsqueeze(-1)
-
-        H_tilde = 0.5 * (term1 - term2 - term3)
-    else:
-        H_tilde_list = []
-        for i in range(Batch):
-            L_sub = L[i]
-            Y_sub = Y[i]
-
-            L_mul_Y = L_sub @ Y_sub
-
-            Y_expanded = Y_sub.unsqueeze(-1)
-            YT_expanded = Y_sub.unsqueeze(-2)
-
-            term1 = (L_sub @ (Y_expanded * YT_expanded).view(N, n * n)).view(N, n, n)
-            term2 = Y_expanded * L_mul_Y.unsqueeze(-2)
-            term3 = YT_expanded * L_mul_Y.unsqueeze(-1)
-
-            H_tilde_sub = 0.5 * (term1 - term2 - term3)
-            H_tilde_list.append(H_tilde_sub)
-
-        H_tilde = torch.stack(H_tilde_list, dim=0)
+    # term1[b,i,j,k] = sum_{l} L[b,i,l] * Y[b,l,j] * Y[b,l,k]
+    term1 = torch.einsum("bil,blj,blk->bijk", L, Y, Y)
+    # term2[b,i,j,k] = Y[b,i,j] * L_mul_Y[b,i,k]
+    term2 = torch.einsum("bij,bik->bijk", Y, L_mul_Y)
+    # term3[b,i,j,k] = Y[b,i,k] * L_mul_Y[b,i,j]
+    term3 = torch.einsum("bik,bij->bijk", Y, L_mul_Y)
+    H_tilde = 0.5 * (term1 - term2 - term3)
 
     return H_tilde
 
