@@ -322,12 +322,16 @@ class spclt():
                 if n_iters is not None and self.iter_n >= n_iters:
                     continue_training = False
                     break
-
+            
             # save average loss per epoch
             train_loss /= train_batch_iter
             for key in train_loss_comp:
                 train_loss_comp[key] = (train_loss_comp[key] / train_batch_iter).item()
             loss_log[self.epoch_n] = [train_loss.item()] + list(train_loss_comp.values())
+
+            # print training loss if n_iters is specified
+            if n_iters is not None and verbose:
+                progress_bar.set_postfix(loss_comp=train_loss_comp, refresh=True)
 
             # if the scheduler is set to 'reduced', evaluate validation loss and update learning rate
             if scheduler == 'reduced':
