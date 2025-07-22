@@ -50,8 +50,8 @@ class trainer():
         self.encoder = spclt(loader, **self.model_config)
 
         self.soft_assignments = datautils.assign_soft_labels(sim_mat, self.tau_inst)
-        if self.soft_assignments is None:
-            print('Soft assignment is not used in this run.')
+        # if self.soft_assignments is None:
+        #     print('Soft assignment is not used in this run.')
         
         return self
 

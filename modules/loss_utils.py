@@ -75,23 +75,27 @@ def timelag_sigmoid(z1, sigma=1):
 ## functions and classes for topology preserving regularizer ##
 ###############################################################
 
-def tensor_norm_ts(TS):
+def tensor_norm_ts(TS, TS_max=None, TS_min=None):
     """
     Normalize a time series tensor per feature.
     """
     TS = torch.nan_to_num(TS, nan=0.0, posinf=1e8, neginf=-1e8)  # replace NaN and inf values
-    TS_max, _ = torch.max(TS, dim=0, keepdim=True)
-    TS_min, _ = torch.min(TS, dim=0, keepdim=True)
-    TS_range = TS_max - TS_min
-    TS = (TS - TS_min) / torch.where(TS_range < 1e-6, 1., TS_range)
+    if TS_max is None or TS_min is None:
+        TS_max, _ = torch.max(TS, dim=0, keepdim=True)
+        TS_min, _ = torch.min(TS, dim=0, keepdim=True)
+    else:
+        TS_max = TS_max.unsqueeze(0)
+        TS_min = TS_min.unsqueeze(0)
+    TS_range = TS_max - TS_min + 1e-6  # avoid division by zero
+    TS = (TS - TS_min) / TS_range
     return TS
 
 
-def topo_euclidean_distance_matrix(x, p=2):
+def topo_euclidean_distance_matrix(x, x_max=None, x_min=None, p=2):
     """
     Computes the pairwise Euclidean distance matrix between the rows of a 2D tensor.
     """
-    x = tensor_norm_ts(x)
+    x = tensor_norm_ts(x, x_max, x_min)
     x_flat = x.view(x.size(0), -1)
     distances = torch.norm(x_flat[:, None] - x_flat, dim=2, p=p)
     return distances
@@ -243,20 +247,18 @@ class TopologicalSignatureDistance(torch.nn.Module):
 ## functions and classes for geometry preserving regularizer ##
 ###############################################################
 
-def get_laplacian(X, bandwidth=50): # bandwidth tuning should increase exponentially like bw**2
+def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning should increase exponentially like bw**2
     """
     Calculate the Normalized Graph Laplacian for a given set of data points.
     """
-    X = tensor_norm_ts(X)
+    X = tensor_norm_ts(X, X_max, X_min)
 
-    if X.ndim == 3:
-        B, N, _ = X.shape
-    elif X.ndim == 4:
-        X = X.contiguous().view(X.size(0), X.size(2), -1) # use N as the number of nodes for MacroTraffic
-        B, N, _ = X.shape                                 # use N as the number of timesteps for MicroTraffic
+    if X.ndim == 4:
+        X = X.contiguous().view(X.size(0), X.size(2), -1) # use N as the number of nodes (193) for MacroTraffic
+    B, N, _ = X.shape                                 # use T as the number of timesteps (10) for MicroTraffic
     c = 1/4
 
-    dist_XX = torch.cdist(X, X, p=2)
+    dist_XX = torch.cdist(X, X, p=2) # (B, N, N) or (B, T, T)
     K = torch.exp(-dist_XX**2 / bandwidth)
     d_i = K.sum(dim=1)
     D_inv = torch.diag_embed(1/d_i)

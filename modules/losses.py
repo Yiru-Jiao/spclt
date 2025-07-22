@@ -23,18 +23,18 @@ def combined_loss(model, x, loss_config, regularizer_config):
         loss_components['log_var_scl'] = model.loss_log_vars[0]
         
         if regularizer_config['reserve'] == 'topology':
-            loss_topo_regularizer = topo_loss(model, x)
+            loss_topo_regularizer = topo_loss(model, x, regularizer_config['x_max'], regularizer_config['x_min'])
             loss += 0.5 * torch.exp(-model.loss_log_vars[1]) * loss_topo_regularizer*(1-torch.exp(-loss_topo_regularizer)) + 0.5 * model.loss_log_vars[1]
             loss_components['loss_topo_regularizer'] = loss_topo_regularizer
             loss_components['log_var_topo'] = model.loss_log_vars[1]
         elif regularizer_config['reserve'] == 'geometry':
-            loss_geo_regularizer = geo_loss(model, x, regularizer_config['bandwidth'])
+            loss_geo_regularizer = geo_loss(model, x, regularizer_config['x_max'], regularizer_config['x_min'], regularizer_config['bandwidth'])
             loss += 0.5 * torch.exp(-model.loss_log_vars[1]) * loss_geo_regularizer*(1-torch.exp(-loss_geo_regularizer)) + 0.5 * model.loss_log_vars[1]
             loss_components['loss_geo_regularizer'] = loss_geo_regularizer
             loss_components['log_var_geo'] = model.loss_log_vars[1]
         elif regularizer_config['reserve'] == 'both':
-            loss_topo_regularizer = topo_loss(model, x)
-            loss_geo_regularizer = geo_loss(model, x, regularizer_config['bandwidth'])
+            loss_topo_regularizer = topo_loss(model, x, regularizer_config['x_max'], regularizer_config['x_min'])
+            loss_geo_regularizer = geo_loss(model, x, regularizer_config['x_max'], regularizer_config['x_min'], regularizer_config['bandwidth'])
             loss += 0.5 * torch.exp(-model.loss_log_vars[1]) * loss_topo_regularizer*(1-torch.exp(-loss_topo_regularizer)) + 0.5 * model.loss_log_vars[1]
             loss += 0.5 * torch.exp(-model.loss_log_vars[2]) * loss_geo_regularizer*(1-torch.exp(-loss_geo_regularizer)) + 0.5 * model.loss_log_vars[2]
             loss_components['loss_topo_regularizer'] = loss_topo_regularizer
@@ -140,12 +140,12 @@ def hierarchical_contrastive_loss(z1, z2, temporal_unit=0, lambda_inst=0.5,
     return loss / d
 
 
-def topo_loss(model, x):
+def topo_loss(model, x, x_max=None, x_min=None):
     # encode using model
     latent = model.encode(x, **model.encode_args)
 
     # compute and normalize distances in the original sapce and latent space
-    x_distances = topo_euclidean_distance_matrix(x) # (B, N, N)
+    x_distances = topo_euclidean_distance_matrix(x, x_max, x_min) # (B, N, N)
     x_distances = x_distances / x_distances.max()
     latent_distances = topo_euclidean_distance_matrix(latent) # (B, N, N)
     latent_distances = latent_distances / latent_distances.max()
@@ -161,7 +161,7 @@ def topo_loss(model, x):
     return topo_error
 
 
-def geo_loss(model, x, bandwidth):
+def geo_loss(model, x, x_max=None, x_min=None, bandwidth=1.):
     # encode using model
     latent = model.encode(x)
     """
@@ -169,12 +169,10 @@ def geo_loss(model, x, bandwidth):
     the original shape of x is (n_samples, n_agents, n_timesteps, n_features), 
     the latent shape is (n_samples, n_agents=26, n_latent_features=128)
     ggeo_loss will be computed for agent dimension
-    """
-    # Switch axes to (n_samples, n_timesteps, n_agents, n_features) for MicroTraffic data
-    if model.loader == 'MicroTraffic':
-        x = x.permute(0, 2, 1, 3)
-    
-    L = get_laplacian(x, bandwidth=bandwidth)
+    For MacroTraffic data, the shape of x is (n_samples, n_timesteps, n_nodes, n_features)
+    the latent will be computed for node dimension
+    """    
+    L = get_laplacian(x, x_max, x_min, bandwidth=bandwidth)
     distortion, n = relaxed_distortion_measure_JGinvJT(L, latent)
 
     # Normalize distortion

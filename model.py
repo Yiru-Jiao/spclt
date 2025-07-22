@@ -246,6 +246,12 @@ class spclt():
         else:
             ValueError("Undefined scheduler: should be either 'constant' or 'reduced'.")
 
+        # determine range of input
+        x_max = torch.tensor(np.percentile(train_data, 90, axis=0), device=self.device) # train_data: [n_instances, n_timestamps, output_dims], x_max: [n_timestamps, output_dims]
+        x_min = torch.tensor(np.percentile(train_data, 10, axis=0), device=self.device) # x_max.unsqueeze(0): [1, n_timestamps, output_dims]
+        self.regularizer_config['x_max'] = x_max
+        self.regularizer_config['x_min'] = x_min
+
         # create training dataset, dataloader, and loss log
         train_dataset = datautils.custom_dataset(torch.from_numpy(train_data).float(), self.loader)
         train_loader = DataLoader(train_dataset, batch_size=min(self.batch_size, len(train_dataset)), shuffle=True, drop_last=True)
