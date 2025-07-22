@@ -172,6 +172,10 @@ def geo_loss(model, x, x_max=None, x_min=None, bandwidth=1.):
     For MacroTraffic data, the shape of x is (n_samples, n_timesteps, n_nodes, n_features)
     the latent will be computed for node dimension
     """    
+    # Switch axes to (n_samples, n_timesteps, n_agents, n_features) for MicroTraffic data
+    if model.loader == 'MicroTraffic':
+        x = x.permute(0, 2, 1, 3)
+    
     L = get_laplacian(x, x_max, x_min, bandwidth=bandwidth)
     distortion, n = relaxed_distortion_measure_JGinvJT(L, latent)
 

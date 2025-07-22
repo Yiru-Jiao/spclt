@@ -255,10 +255,10 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
 
     if X.ndim == 4:
         X = X.contiguous().view(X.size(0), X.size(2), -1) # use N as the number of nodes (193) for MacroTraffic
-    B, N, _ = X.shape                                 # use T as the number of timesteps (10) for MicroTraffic
+    B, N, _ = X.shape                                     # use N as the number of road users (26) for MicroTraffic
     c = 1/4
 
-    dist_XX = torch.cdist(X, X, p=2) # (B, N, N) or (B, T, T)
+    dist_XX = torch.cdist(X, X, p=2) # (B, N, N)
     K = torch.exp(-dist_XX**2 / bandwidth)
     d_i = K.sum(dim=1)
     D_inv = torch.diag_embed(1/d_i)
@@ -268,10 +268,12 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     I = torch.diag_embed(torch.ones(B, N, device=X.device))
     L = (D_tilde_inv@K_tilde - I)/(c*bandwidth)
 
-    return L # (B, N, N) or (B, T, T)
+    return L # (B, N, N)
 
 
-def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=128, k_chunk=512):
+@torch.compile(mode="reduce-overhead", fullgraph=True)       # PT ≥ 2.6  :contentReference[oaicite:2]{index=2}
+@torch.inference_mode()                                   # no autograd bookkeeping :contentReference[oaicite:3]{index=3}
+def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=1024, k_chunk=2048):
     """
     Calculate the relaxed distortion measure for a given JGinvJT matrix.
     """
@@ -300,12 +302,14 @@ def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=128, k_chunk=512):
         sum_tr  = torch.zeros(B, device=device)
         sum_fro = torch.zeros(B, device=device)
 
+        H_BLK = torch.empty(B, node_chunk, n, n, device=device)
         for i0 in range(0, N, node_chunk):
             i1 = min(i0 + node_chunk, N)
 
             # ── term-1: Σ_k  L_{ik} · Y_k Y_kᵀ   (chunk in k)
             # we build it for node-block (B, i_block, n, n)
-            H_blk = torch.zeros(B, i1 - i0, n, n, device=device)
+            H_blk = H_BLK[:, :i1-i0, :, :]
+            H_blk.zero_()
 
             for k0 in range(0, N, k_chunk):
                 k1    = min(k0 + k_chunk, N)
@@ -319,8 +323,7 @@ def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=128, k_chunk=512):
             Y_i  = Y[:, i0:i1, :]                       # (B,i,n)
             LY_i = LY[:, i0:i1, :]                      # (B,i,n)
 
-            H_blk.mul_(0.5)
-            H_blk.add_(
+            H_blk.mul_(0.5).add_(
                 -0.5 * (
                     Y_i.unsqueeze(-1)  * LY_i.unsqueeze(-2) +
                     LY_i.unsqueeze(-1) * Y_i.unsqueeze(-2)
@@ -333,10 +336,6 @@ def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=128, k_chunk=512):
 
             sum_tr  += tr.sum(dim=1)
             sum_fro += fro.sum(dim=1)
-
-            # free the block ASAP
-            del H_blk, tr, fro
-            torch.cuda.empty_cache()            # keeps long runs flat
 
         # final distortion  =  E_i[TrH²] - 2·E_i[TrH]
         distortion = sum_fro.mean() / N  -  2 * (sum_tr.mean() / N)
