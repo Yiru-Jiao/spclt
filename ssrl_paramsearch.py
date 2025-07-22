@@ -161,7 +161,7 @@ def main(args):
                           'temporal_hierarchy': [None],
                           'bandwidth': [1.],
                           'batch_size': [8],
-                          'weight_lr': [0.01]}
+                          'weight_lr': [0.05]}
 
         # Define the search space
         if args.n_fold < 1:

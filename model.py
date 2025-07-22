@@ -247,8 +247,13 @@ class spclt():
             ValueError("Undefined scheduler: should be either 'constant' or 'reduced'.")
 
         # determine range of input
-        x_max = torch.tensor(np.percentile(train_data, 90, axis=0), device=self.device) # train_data: [n_instances, n_timestamps, output_dims], x_max: [n_timestamps, output_dims]
-        x_min = torch.tensor(np.percentile(train_data, 10, axis=0), device=self.device) # x_max.unsqueeze(0): [1, n_timestamps, output_dims]
+        x_max = torch.from_numpy(np.percentile(train_data, 90, axis=0)).float().to(self.device)
+        # train_data: [n_instances, n_timestamps, output_dims], x_max: [n_timestamps, output_dims]
+        x_min = torch.from_numpy(np.percentile(train_data, 10, axis=0)).float().to(self.device)
+        # x_min.unsqueeze(0): [1, n_timestamps, output_dims]
+        if 'Macro' in self.loader:
+            x_max = x_max[:, :-15, :, :] # remove the last 15 timestamps for MacroTraffic because
+            x_min = x_min[:, :-15, :, :] # they are for prediction and should not be used for training
         self.regularizer_config['x_max'] = x_max
         self.regularizer_config['x_min'] = x_min
 
@@ -331,7 +336,7 @@ class spclt():
 
             # print training loss if n_iters is specified
             if n_iters is not None and verbose:
-                progress_bar.set_postfix(loss_comp=train_loss_comp, refresh=True)
+                progress_bar.set_postfix(loss_comp=train_loss_comp, refresh=False)
 
             # if the scheduler is set to 'reduced', evaluate validation loss and update learning rate
             if scheduler == 'reduced':
