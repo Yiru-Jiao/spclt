@@ -86,8 +86,8 @@ def tensor_norm_ts(TS, TS_max=None, TS_min=None):
     else:
         TS_max = TS_max.unsqueeze(0)
         TS_min = TS_min.unsqueeze(0)
-    TS_range = TS_max - TS_min + 1e-6  # avoid division by zero
-    TS = (TS - TS_min) / TS_range
+    TS_range = TS_max - TS_min
+    TS = (TS - TS_min) / torch.where(TS_range < 1e-6, 1, TS_range)
     return TS
 
 
@@ -271,9 +271,8 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     return L # (B, N, N)
 
 
-@torch.compile(mode="reduce-overhead", fullgraph=True)       # PT ≥ 2.6  :contentReference[oaicite:2]{index=2}
-@torch.inference_mode()                                   # no autograd bookkeeping :contentReference[oaicite:3]{index=3}
-def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=1024, k_chunk=2048):
+@torch.compile(mode="reduce-overhead", fullgraph=True, dynamic=True)       # PT ≥ 2.6  :contentReference[oaicite:2]{index=2}
+def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=512, k_chunk=1024):
     """
     Calculate the relaxed distortion measure for a given JGinvJT matrix.
     """

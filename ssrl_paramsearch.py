@@ -212,6 +212,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['batch_size'], params, search_space, grid_search_args)
             best_param_log['TS2Vec_Phase1'] = params
+            best_param_log['TS2Vec_Phase1']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- TS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
@@ -224,6 +225,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['weight_lr'], params, search_space, grid_search_args)
             best_param_log['TopoTS2Vec_Phase1'] = params
+            best_param_log['TopoTS2Vec_Phase1']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- TopoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
@@ -236,6 +238,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['bandwidth', 'weight_lr'], params, search_space, grid_search_args)
             best_param_log['GGeoTS2Vec_Phase1'] = params
+            best_param_log['GGeoTS2Vec_Phase1']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- GGeoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
@@ -249,6 +252,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['tau_temp', 'temporal_hierarchy'], params, search_space, grid_search_args)
             best_param_log['SoftCLT_Phase1'] = params
+            best_param_log['SoftCLT_Phase1']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- SoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
@@ -258,6 +262,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['tau_inst', 'batch_size'], params, search_space, grid_search_args)
             best_param_log['SoftCLT_Phase2'] = params
+            best_param_log['SoftCLT_Phase2']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- SoftCLT_Phase2 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
@@ -270,6 +275,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['weight_lr'], params, search_space, grid_search_args)
             best_param_log['TopoSoftCLT_Phase1'] = params
+            best_param_log['TopoSoftCLT_Phase1']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- TopoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
@@ -282,6 +288,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['bandwidth', 'weight_lr'], params, search_space, grid_search_args)
             best_param_log['GGeoSoftCLT_Phase1'] = params
+            best_param_log['GGeoSoftCLT_Phase1']['score'] = best_score
             save_best_params(best_param_log, log_dir)
             print('--- GGeoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 

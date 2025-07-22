@@ -57,7 +57,7 @@ def fix_seed(seed, deterministic=False):
     torch.backends.cudnn.benchmark = False
 
 
-def init_dl_program(gpu_num=0, max_threads=None, use_tf32=False):
+def init_dl_program(gpu_num=0, max_threads=None, use_tf32=True):
 
     if max_threads is not None:
         torch.set_num_threads(max_threads)  # intraop
