@@ -146,9 +146,7 @@ def topo_loss(model, x, x_max=None, x_min=None):
 
     # compute and normalize distances in the original sapce and latent space
     x_distances = topo_euclidean_distance_matrix(x, x_max, x_min) # (B, N, N)
-    x_distances = x_distances / x_distances.max()
     latent_distances = topo_euclidean_distance_matrix(latent) # (B, N, N)
-    latent_distances = latent_distances / latent_distances.max()
 
     # compute topological signature distance
     topo_sig = TopologicalSignatureDistance()

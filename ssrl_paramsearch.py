@@ -104,11 +104,27 @@ def main(args):
             params = {**params, parameter: [best_params[parameter]]}
         return params, best_score
     
-    def save_best_params(best_param_log, log_dir):
-        log2save = best_param_log.copy()
-        for tuned_phase, tuned_params in log2save.items():
-            log2save[tuned_phase] = {key:value[0] if isinstance(value, list) else value for key,value in tuned_params.items()}
-        log2save = pd.DataFrame(log2save).T # index: phase, columns: hyperparameters and score
+    def save_best_params(best_param_log, log_dir, best_score=None):
+        tuned_phase = list(best_param_log.keys())[-1]
+        tuned_params = best_param_log[tuned_phase]
+        if os.path.exists(log_dir): # previous log exists, append the new best params
+            log2save = pd.read_csv(log_dir, index_col=0)
+            for key, value in tuned_params.items():
+                value2log = value[0] if isinstance(value, list) else value
+                if key == 'batch_size':
+                    value2log = int(value2log)
+                log2save.loc[tuned_phase, key] = value2log
+        else: # save for the first phase
+            log2save = pd.DataFrame()
+            assert len(best_param_log.keys()) == 1, 'There should be only one phase in the best_param_log for the first save'
+            log2save = pd.DataFrame({key: {tuned_phase: value[0] if isinstance(value, list) else value}
+                                    for key, value in tuned_params.items()})
+            log2save.index.name = 'phase'
+            log2save['best score'] = np.nan  # Initialize the best score column
+            log2save['batch_size'] = log2save['batch_size'].astype(int)  # Ensure batch_size is int type
+            log2save['temporal_hierarchy'] = log2save['temporal_hierarchy'].astype(object)  # Ensure temporal_hierarchy is object type
+        if best_score is not None:
+            log2save.loc[tuned_phase, 'best score'] = best_score
         log2save.to_csv(log_dir)
 
     # Read the dataset list
@@ -184,13 +200,7 @@ def main(args):
             best_param_log = pd.read_csv(log_dir, index_col=0)
             best_param_log = best_param_log.to_dict(orient='index')
         else:
-            other_log_dir = f'results/hyper_parameters/{args.loader}/{dataset}_tuned_hyperparameters.csv'
-            if os.path.exists(other_log_dir):
-                best_param_log = pd.read_csv(other_log_dir, index_col=0)
-                best_param_log = best_param_log.loc[['TS2Vec_Phase1','SoftCLT_Phase1','SoftCLT_Phase2']]
-                best_param_log = best_param_log.to_dict(orient='index')
-            else:
-                best_param_log = {}
+            best_param_log = {}
 
         # Define the grid search arguments
         grid_search_args = {'loader': args.loader,
@@ -212,8 +222,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['batch_size'], params, search_space, grid_search_args)
             best_param_log['TS2Vec_Phase1'] = params
-            best_param_log['TS2Vec_Phase1']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- TS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # TopoTS2Vec (tau_inst=0, tau_temp=0, topology regularizer)
@@ -225,8 +234,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['weight_lr'], params, search_space, grid_search_args)
             best_param_log['TopoTS2Vec_Phase1'] = params
-            best_param_log['TopoTS2Vec_Phase1']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- TopoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # GGeoTS2Vec (tau_inst=0, tau_temp=0, geometry regularizer)
@@ -238,8 +246,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['bandwidth', 'weight_lr'], params, search_space, grid_search_args)
             best_param_log['GGeoTS2Vec_Phase1'] = params
-            best_param_log['GGeoTS2Vec_Phase1']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- GGeoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # SoftCLT (use soft labels, no regularizer)
@@ -252,8 +259,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['tau_temp', 'temporal_hierarchy'], params, search_space, grid_search_args)
             best_param_log['SoftCLT_Phase1'] = params
-            best_param_log['SoftCLT_Phase1']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- SoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         if 'SoftCLT_Phase2' in best_param_log:
@@ -262,8 +268,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['tau_inst', 'batch_size'], params, search_space, grid_search_args)
             best_param_log['SoftCLT_Phase2'] = params
-            best_param_log['SoftCLT_Phase2']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- SoftCLT_Phase2 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # TopoSoftCLT (use soft labels, topology regularizer)
@@ -275,8 +280,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['weight_lr'], params, search_space, grid_search_args)
             best_param_log['TopoSoftCLT_Phase1'] = params
-            best_param_log['TopoSoftCLT_Phase1']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- TopoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # GGeoSoftCLT (use soft labels, geometry regularizer)
@@ -288,8 +292,7 @@ def main(args):
         else:
             params, best_score = search_best_params(['bandwidth', 'weight_lr'], params, search_space, grid_search_args)
             best_param_log['GGeoSoftCLT_Phase1'] = params
-            best_param_log['GGeoSoftCLT_Phase1']['score'] = best_score
-            save_best_params(best_param_log, log_dir)
+            save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- GGeoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         print(f'--- {dataset} hyperparameter search completed, time elapsed : ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time()-start_time)) + ' ---')
