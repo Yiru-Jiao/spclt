@@ -99,6 +99,8 @@ class spclt():
         if isinstance(soft_assignments, np.ndarray):
             assert soft_assignments.shape[0] == soft_assignments.shape[1]
             assert train_data.shape[0] == soft_assignments.shape[0]
+        if n_iters is not None: # flag to indicate that the model is searching for the best hyperparameters
+            self.param_searching = True
 
         self.train()
 

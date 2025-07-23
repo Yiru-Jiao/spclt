@@ -177,7 +177,10 @@ def geo_loss(model, x, x_max=None, x_min=None, bandwidth=1.):
         x = x.permute(0, 2, 1, 3)
     
     L = get_laplacian(x, x_max, x_min, bandwidth=bandwidth)
-    distortion, n = relaxed_distortion_measure_JGinvJT(L, latent)
+    if model.param_searching: 
+        distortion, n = relaxed_distortion_measure_JGinvJT(L, latent) # node_chunk = 128, k_chunk = 256
+    else:
+        distortion, n = relaxed_distortion_measure_JGinvJT(L, latent, node_chunk=256, k_chunk=256)
 
     # Normalize distortion
     iso_loss = distortion / n + 1.
