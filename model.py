@@ -251,15 +251,15 @@ class spclt():
         # x_min.unsqueeze(0): [1, n_timestamps, output_dims]
         if 'Macro' in self.loader:
             # remove the last 15 timestamps for MacroTraffic because they are for prediction and should not be used for training
-            x_max = torch.from_numpy(np.percentile(train_data[:, :-15, :, :], 90, axis=0)).float().to(self.device)
-            x_min = torch.from_numpy(np.percentile(train_data[:, :-15, :, :], 10, axis=0)).float().to(self.device)
+            x_max = torch.from_numpy(np.percentile(train_data[:, :-15, :, :], 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(train_data[:, :-15, :, :], 5, axis=0)).float().to(self.device)
         elif 'Micro' in self.loader and self.regularizer_config['reserve'] == 'geometry':
             # exchange the dimensions of timestamps and n_agents for MicroTraffic
-            x_max = torch.from_numpy(np.percentile(np.transpose(train_data, (0,2,1,3)), 90, axis=0)).float().to(self.device)
-            x_min = torch.from_numpy(np.percentile(np.transpose(train_data, (0,2,1,3)), 10, axis=0)).float().to(self.device)
+            x_max = torch.from_numpy(np.percentile(np.transpose(train_data, (0,2,1,3)), 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(np.transpose(train_data, (0,2,1,3)), 5, axis=0)).float().to(self.device)
         else:
-            x_max = torch.from_numpy(np.percentile(train_data, 90, axis=0)).float().to(self.device)
-            x_min = torch.from_numpy(np.percentile(train_data, 10, axis=0)).float().to(self.device)
+            x_max = torch.from_numpy(np.percentile(train_data, 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(train_data, 5, axis=0)).float().to(self.device)
         self.regularizer_config['x_max'] = x_max
         self.regularizer_config['x_min'] = x_min
 
