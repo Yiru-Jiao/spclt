@@ -109,6 +109,8 @@ def main(args):
         tuned_params = best_param_log[tuned_phase]
         if os.path.exists(log_dir): # previous log exists, append the new best params
             log2save = pd.read_csv(log_dir, index_col=0)
+            log2save['batch_size'] = log2save['batch_size'].astype(int)  # Ensure batch_size is int type
+            log2save['temporal_hierarchy'] = log2save['temporal_hierarchy'].astype(str)
             for key, value in tuned_params.items():
                 value2log = value[0] if isinstance(value, list) else value
                 if key == 'batch_size':
