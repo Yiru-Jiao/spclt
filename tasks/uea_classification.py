@@ -85,6 +85,8 @@ def main(args):
     # Initialize evaluation dataframe for UEA classification
     model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
                   'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
+    if args.reversed_list:
+        model_list.reverse()
     clf_clr_metrics = ['svm_acc', 'svm_auprc'] # Classification results
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
 

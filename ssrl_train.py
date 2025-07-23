@@ -99,6 +99,8 @@ def main(args):
                       'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
     else:
         model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.reversed_list:
+        model_list.reverse()
 
     def read_saved_results():
         eval_results = pd.read_csv(results_dir)
