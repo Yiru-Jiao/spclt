@@ -113,6 +113,8 @@ def main(args):
                 value2log = value[0] if isinstance(value, list) else value
                 if key == 'batch_size':
                     value2log = int(value2log)
+                if key == 'temporal_hierarchy':
+                    value2log = str(value2log) if value2log is not None else 'None'
                 log2save.loc[tuned_phase, key] = value2log
         else: # save for the first phase
             log2save = pd.DataFrame()
@@ -122,7 +124,7 @@ def main(args):
             log2save.index.name = 'phase'
             log2save['best_score'] = np.nan  # Initialize the best score column
             log2save['batch_size'] = log2save['batch_size'].astype(int)  # Ensure batch_size is int type
-            log2save['temporal_hierarchy'] = log2save['temporal_hierarchy'].astype(object)  # Ensure temporal_hierarchy is object type
+            log2save['temporal_hierarchy'] = log2save['temporal_hierarchy'].astype(str)
         if best_score is not None:
             log2save.loc[tuned_phase, 'best_score'] = best_score
         log2save.to_csv(log_dir)

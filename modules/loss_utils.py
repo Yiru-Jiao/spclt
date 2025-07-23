@@ -272,17 +272,16 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     return L # (B, N, N)
 
 
-@torch.compile(mode="reduce-overhead", fullgraph=True, dynamic=False)       # PT ≥ 2.6  :contentReference[oaicite:2]{index=2}
 def relaxed_distortion_measure_JGinvJT(L, Y, node_chunk=128, k_chunk=256):
     """
     Calculate the relaxed distortion measure for a given JGinvJT matrix.
     """
     B, N, n = Y.shape
     if B//8 > 2:
-        node_chunk /= 2
-        k_chunk /= 2
+        node_chunk //= 2
+        k_chunk //= 2
     elif B//8 > 1:
-        node_chunk /= 2
+        node_chunk //= 2
 
     if N*n*n <= 1e8:
         # Calculate the JGinvJT matrix for each data point.
