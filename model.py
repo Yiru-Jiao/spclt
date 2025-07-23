@@ -249,19 +249,23 @@ class spclt():
         # determine range of input
         # train_data: [n_instances, n_timestamps, output_dims], x_max: [n_timestamps, output_dims]
         # x_min.unsqueeze(0): [1, n_timestamps, output_dims]
+        train_data_copy = train_data.copy()
+        # replace nan, inf, and -inf with 0
+        train_data_copy = np.nan_to_num(train_data_copy, nan=0.0, posinf=0.0, neginf=0.0)
         if 'Macro' in self.loader:
             # remove the last 15 timestamps for MacroTraffic because they are for prediction and should not be used for training
-            x_max = torch.from_numpy(np.percentile(train_data[:, :-15, :, :], 95, axis=0)).float().to(self.device)
-            x_min = torch.from_numpy(np.percentile(train_data[:, :-15, :, :], 5, axis=0)).float().to(self.device)
+            x_max = torch.from_numpy(np.percentile(train_data_copy[:, :-15, :, :], 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(train_data_copy[:, :-15, :, :], 5, axis=0)).float().to(self.device)
         elif 'Micro' in self.loader and self.regularizer_config['reserve'] == 'geometry':
             # exchange the dimensions of timestamps and n_agents for MicroTraffic
-            x_max = torch.from_numpy(np.percentile(np.transpose(train_data, (0,2,1,3)), 95, axis=0)).float().to(self.device)
-            x_min = torch.from_numpy(np.percentile(np.transpose(train_data, (0,2,1,3)), 5, axis=0)).float().to(self.device)
+            x_max = torch.from_numpy(np.percentile(np.transpose(train_data_copy, (0,2,1,3)), 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(np.transpose(train_data_copy, (0,2,1,3)), 5, axis=0)).float().to(self.device)
         else:
-            x_max = torch.from_numpy(np.percentile(train_data, 95, axis=0)).float().to(self.device)
-            x_min = torch.from_numpy(np.percentile(train_data, 5, axis=0)).float().to(self.device)
+            x_max = torch.from_numpy(np.percentile(train_data_copy, 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(train_data_copy, 5, axis=0)).float().to(self.device)
         self.regularizer_config['x_max'] = x_max
         self.regularizer_config['x_min'] = x_min
+        del train_data_copy
 
         # create training dataset, dataloader, and loss log
         train_dataset = datautils.custom_dataset(torch.from_numpy(train_data).float(), self.loader)
