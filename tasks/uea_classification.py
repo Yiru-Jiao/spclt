@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
+    parser.add_argument('--reversed_list', type=int, default=0, help='Whether to reverse the list of datasets (defaults to False)')
     args = parser.parse_args()
     args.reproduction = bool(args.reproduction)
 
@@ -78,6 +79,8 @@ def main(args):
     dataset_dir = os.path.join('datasets/', args.loader)
     dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
     dataset_list.sort()
+    if args.reversed_list:
+        dataset_list.reverse()
 
     # Initialize evaluation dataframe for UEA classification
     model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
