@@ -440,6 +440,7 @@ class spclt():
  
         org_training = self.net.training
         self.eval()
+        val_loss = torch.tensor(0., device=self.device, requires_grad=False)
         val_loss_comp = {}
         with torch.no_grad():
             for val_batch_iter, (x, idx) in enumerate(val_loader, start=1):
@@ -458,6 +459,7 @@ class spclt():
                 loss, loss_comp = self.loss_func(self, x.to(self.device),
                                                          val_loss_config, 
                                                          self.regularizer_config)
+                val_loss += loss
                 if len(val_loss_comp) == 0:
                     for key in loss_comp:
                         val_loss_comp[key] = torch.tensor(0., device=self.device, requires_grad=False)
@@ -467,11 +469,13 @@ class spclt():
         if org_training:
             self.train()
 
+        # compute average loss
+        val_loss /= val_batch_iter
         for key in val_loss_comp:
             val_loss_comp[key] = (val_loss_comp[key] / val_batch_iter).item()
 
         if non_regularized:
-            return val_loss_comp['loss_scl']
+            return val_loss
         else:
             return val_loss_comp.values()
 
