@@ -101,6 +101,8 @@ class spclt():
             assert train_data.shape[0] == soft_assignments.shape[0]
         if n_iters is not None: # flag to indicate that the model is searching for the best hyperparameters
             self.param_searching = True
+        else:
+            self.param_searching = False
 
         self.train()
 
@@ -404,6 +406,9 @@ class spclt():
             if n_epochs is not None and self.epoch_n >= n_epochs:
                 continue_training = False
                 break
+        
+        if n_epochs is not None and verbose:
+            progress_bar.set_postfix(loss_comp=train_loss_comp, refresh=False)
         
         progress_bar.close()
         if self.after_iter_callback is not None:

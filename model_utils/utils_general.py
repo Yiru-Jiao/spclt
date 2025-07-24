@@ -209,7 +209,7 @@ def configure_model(args, input_dims, device):
 
 def save_loss_log(loss_log, save_dir, regularizer=None):
     loss_log = loss_log.reshape(-1, loss_log.shape[-1])
-    loss_log = loss_log[~np.isnan(loss_log).any(axis=1)]  # Remove rows with NaN values
+    loss_log = loss_log[~np.isnan(loss_log).all(axis=1)]  # Remove rows with NaN values
     if loss_log.shape[-1] == 2:
         loss_log = pd.DataFrame(loss_log, columns=['loss', 'loss_scl'])
     elif loss_log.shape[-1] == 5:

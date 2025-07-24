@@ -79,9 +79,7 @@ def main(args):
         dataset_list.sort()
         if args.reversed_list:
             dataset_list.reverse()
-        if args.dataset is None:
-            dataset_list = [dataset for dataset in dataset_list if not dataset!='EigenWorms']
-        else:
+        if args.dataset is not None:
             if args.dataset in dataset_list:
                 dataset_list = [args.dataset]
             else:
@@ -180,7 +178,15 @@ def main(args):
             os.makedirs(model_dir, exist_ok=True)
 
             # Train model if not already trained or if training time is not recorded
-            loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
+            if os.path.exists(f'{model_dir}/loss_log.csv'):
+                loss_log = pd.read_csv(f'{model_dir}/loss_log.csv')
+                if len(loss_log) >= 5:
+                    loss_log_exist = True
+                else:
+                    print(f'****** {model_dir}/loss_log.csv is empty ******')
+                    loss_log_exist = False
+            else:
+                loss_log_exist = False
             if loss_log_exist and (eval_results.loc[(model_type, dataset), 'training_time'] > 0):
                 print(f'--- {model_type} {dataset} has been trained, skip training ---')
             else:
