@@ -133,10 +133,12 @@ def main(args):
         # sort phases according to the order of the search
         phase_order = ['TS2Vec_Phase1', 'TopoTS2Vec_Phase1', 'GGeoTS2Vec_Phase1', 
                        'SoftCLT_Phase1', 'SoftCLT_Phase2', 'TopoSoftCLT_Phase1', 'GGeoSoftCLT_Phase1']
+        phase2order = []
         for phase in phase_order:
-            if phase not in log2save.index:
-                phase_order.remove(phase)
-        log2save = log2save.loc[phase_order]
+            if phase in log2save.index:
+                phase2order.append(phase)
+        if len(phase2order) > 0:
+            log2save = log2save.loc[phase2order]
         log2save.to_csv(log_dir)
 
     # Read the dataset list
