@@ -147,8 +147,6 @@ def main(args):
         dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
         dataset_list = [dataset for dataset in dataset_list if dataset not in ['DuckDuckGeese', 'EigenWorms', 'MotorImagery', 'SelfRegulationSCP1']]
         dataset_list.sort()
-        if args.reverse_list:
-            dataset_list = dataset_list[::-1]
     elif 'Macro' in args.loader:
         dataset_list = [['2019']]
     elif args.loader == 'MicroTraffic':
@@ -160,6 +158,9 @@ def main(args):
         dataset_list = ['DuckDuckGeese', 'EigenWorms', 'MotorImagery', 'SelfRegulationSCP1']
         args.n_fold = 0
         args.n_jobs = 2
+
+    if args.reverse_list:
+        dataset_list = dataset_list[::-1]
 
     # Search for each dataset
     for dataset in dataset_list:
@@ -221,6 +222,19 @@ def main(args):
             best_param_log = best_param_log.to_dict(orient='index')
         else:
             best_param_log = {}
+
+        if os.path.exists(log_dir): # previous log exists, append the new best params
+            log2save = pd.read_csv(log_dir, index_col=0)
+        # sort phases according to the order of the search
+        phase_order = ['TS2Vec_Phase1', 'TopoTS2Vec_Phase1', 'GGeoTS2Vec_Phase1', 
+                       'SoftCLT_Phase1', 'SoftCLT_Phase2', 'TopoSoftCLT_Phase1', 'GGeoSoftCLT_Phase1']
+        phase2order = []
+        for phase in phase_order:
+            if phase in log2save.index:
+                phase2order.append(phase)
+        if len(phase2order) > 0:
+            log2save = log2save.loc[phase2order]
+        log2save.to_csv(log_dir)
 
         # Define the grid search arguments
         grid_search_args = {'loader': args.loader,

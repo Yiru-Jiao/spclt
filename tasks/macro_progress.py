@@ -31,6 +31,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100, help='The number of epochs')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to False)')
+    parser.add_argument('--reversed_list', type=int, default=0, help='Whether to reverse the list of nodes (defaults to False)')
     args = parser.parse_args()
     args.reproduction = bool(args.reproduction)
     return args
@@ -92,6 +93,8 @@ def main(args):
 
     # Initialize evaluation results
     model_list = ['original', 'ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.reversed_list:
+        model_list = model_list[::-1]
     for model_type in model_list:
         os.makedirs(save_dir+model_type, exist_ok=True)
 
@@ -182,6 +185,9 @@ def main(args):
         progress_list = sorted(progress_list, key=lambda x: int(x.split('ckpt_')[1].split('.pth')[0]))
         initial_file_saved_time = os.path.getmtime(progress_list[0])
         epoch_indecies = [int(epoch_path.split('ckpt_')[1].split('.pth')[0]) for epoch_path in progress_list]
+        if args.reversed_list:
+            epoch_indecies = epoch_indecies[::-1]
+            progress_list = progress_list[::-1]
         for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, dynamic_ncols=False,miniters=10, total=len(progress_list)):
             if eval_results.loc[(model_type, epoch_index), 'mae'] > 0 and args.prediction_model != 'DGCN':
                 print(f'--- {model_type}-{epoch_index} has been evaluated, skipping evaluation ---')
