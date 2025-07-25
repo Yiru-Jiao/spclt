@@ -76,6 +76,46 @@ class spclt():
         self.after_iter_callback = after_iter_callback
         self.after_epoch_callback = after_epoch_callback
 
+    # determine range of input
+    def set_input_range(self, train_data):
+        """
+        Set the range of input data for regularization.
+        Used in testing only.
+        """
+        # exclude instances with all missing values
+        isnanmat = np.isnan(train_data)
+        while isnanmat.ndim > 1:
+            isnanmat = isnanmat.all(axis=-1)
+        reserved_idx = ~isnanmat
+        # define training and validation data
+        train_val_data = train_data[reserved_idx]
+        # randomly split the training data into training and validation sets, fix seed for consistency across losses
+        val_indices = np.random.RandomState(131).choice(len(train_val_data), int(len(train_val_data)*0.25), replace=False)
+        train_indices = np.setdiff1d(np.arange(len(train_val_data)), val_indices)
+        train_data = train_val_data[train_indices].copy()
+        del train_val_data, reserved_idx, train_indices, val_indices
+
+        # determine range of input
+        # train_data: [n_instances, n_timestamps, output_dims], x_max: [n_timestamps, output_dims]
+        # x_min.unsqueeze(0): [1, n_timestamps, output_dims]
+        train_data_copy = train_data.copy()
+        # replace nan, inf, and -inf with 0
+        train_data_copy = np.nan_to_num(train_data_copy, nan=0.0, posinf=0.0, neginf=0.0)
+        if 'Macro' in self.loader:
+            # remove the last 15 timestamps for MacroTraffic because they are for prediction and should not be used for training
+            x_max = torch.from_numpy(np.percentile(train_data_copy[:, :-15, :, :], 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(train_data_copy[:, :-15, :, :], 5, axis=0)).float().to(self.device)
+        elif 'Micro' in self.loader and self.regularizer_config['reserve'] == 'geometry':
+            # exchange the dimensions of timestamps and n_agents for MicroTraffic
+            x_max = torch.from_numpy(np.percentile(np.transpose(train_data_copy, (0,2,1,3)), 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(np.transpose(train_data_copy, (0,2,1,3)), 5, axis=0)).float().to(self.device)
+        else:
+            x_max = torch.from_numpy(np.percentile(train_data_copy, 95, axis=0)).float().to(self.device)
+            x_min = torch.from_numpy(np.percentile(train_data_copy, 5, axis=0)).float().to(self.device)
+        self.regularizer_config['x_max'] = x_max
+        self.regularizer_config['x_min'] = x_min
+        del train_data_copy
+
     # define eval() and train() functions
     def eval(self,):
         if self.regularizer_config['reserve'] is None:
@@ -482,7 +522,16 @@ class spclt():
             val_loss_comp[key] = (val_loss_comp[key] / val_batch_iter).item()
 
         if non_regularized:
-            return val_loss_comp['loss_scl']
+            if self.regularizer_config['reserve'] is None:
+                return val_loss_comp['loss_scl']
+            elif self.regularizer_config['reserve'] == 'topology':
+                if np.isnan(val_loss_comp['loss_topo_regularizer']):
+                    return 1e8
+                return val_loss_comp['loss_scl']
+            elif self.regularizer_config['reserve'] == 'geometry':
+                if np.isnan(val_loss_comp['loss_geo_regularizer']):
+                    return 1e8
+                return val_loss_comp['loss_scl']
         else:
             return val_loss_comp
 
