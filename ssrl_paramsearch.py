@@ -50,6 +50,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
     parser.add_argument('--reverse_list', type=int, default=0, help='Whether to reverse the list of datasets (defaults to False)')
+    parser.add_argument('--hard_datasets', type=int, default=0, help='Whether to specifically search for hard datasets (defaults to False)')
     args = parser.parse_args()
     args.reproduction = bool(args.reproduction)
     return args
@@ -129,12 +130,15 @@ def main(args):
         log2save['batch_size'] = log2save['batch_size'].astype(int)  # Ensure batch_size is int type
         log2save = log2save.replace('nan', 'None')
         log2save['temporal_hierarchy'] = log2save['temporal_hierarchy'].astype(str)
-        log2save.to_csv(log_dir)
+        # sort phases according to the order of the search
+        log2save = log2save.loc[['TS2Vec_Phase1', 'TopoTS2Vec_Phase1', 'GGeoTS2Vec_Phase1',
+                                 'SoftCLT_Phase1', 'SoftCLT_Phase2', 'TopoSoftCLT_Phase1', 'GGeoSoftCLT_Phase1']]
 
     # Read the dataset list
     if args.loader == 'UEA':
         dataset_dir = os.path.join('datasets/', args.loader)
         dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
+        dataset_list = [dataset for dataset in dataset_list if dataset not in ['DuckDuckGeese', 'EigenWorms', 'MotorImagery', 'SelfRegulationSCP1']]
         dataset_list.sort()
         if args.reverse_list:
             dataset_list = dataset_list[::-1]
@@ -144,6 +148,11 @@ def main(args):
         dataset_list = [['train1']]
     else:
         raise ValueError(f"Unknown dataset loader: {args.loader}")
+    
+    if args.hard_datasets:
+        dataset_list = ['DuckDuckGeese', 'EigenWorms', 'MotorImagery', 'SelfRegulationSCP1']
+        args.n_fold = 1
+        args.n_jobs = 2
 
     # Search for each dataset
     for dataset in dataset_list:
@@ -212,8 +221,8 @@ def main(args):
                             'dist_metric': dist_metric,
                             'train_data': train_data, 
                             'indexed_sim_mat': indexed_sim_mat,
-                            'n_fold': args.n_fold if dataset not in ['EigenWorms','MotorImagery'] else 0,
-                            'n_jobs': args.n_jobs if dataset not in ['EigenWorms','MotorImagery'] else 1,
+                            'n_fold': args.n_fold,
+                            'n_jobs': args.n_jobs,
                             'fit_config': {'device': device, 'regularizer': None, 'baseline': False}}
 
         # Initialize the dict of parameters
