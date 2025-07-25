@@ -131,8 +131,13 @@ def main(args):
         log2save = log2save.replace('nan', 'None')
         log2save['temporal_hierarchy'] = log2save['temporal_hierarchy'].astype(str)
         # sort phases according to the order of the search
-        log2save = log2save.loc[['TS2Vec_Phase1', 'TopoTS2Vec_Phase1', 'GGeoTS2Vec_Phase1',
-                                 'SoftCLT_Phase1', 'SoftCLT_Phase2', 'TopoSoftCLT_Phase1', 'GGeoSoftCLT_Phase1']]
+        phase_order = ['TS2Vec_Phase1', 'TopoTS2Vec_Phase1', 'GGeoTS2Vec_Phase1', 
+                       'SoftCLT_Phase1', 'SoftCLT_Phase2', 'TopoSoftCLT_Phase1', 'GGeoSoftCLT_Phase1']
+        for phase in phase_order:
+            if phase not in log2save.index:
+                phase_order.remove(phase)
+        log2save = log2save.loc[phase_order]
+        log2save.to_csv(log_dir)
 
     # Read the dataset list
     if args.loader == 'UEA':
@@ -151,7 +156,7 @@ def main(args):
     
     if args.hard_datasets:
         dataset_list = ['DuckDuckGeese', 'EigenWorms', 'MotorImagery', 'SelfRegulationSCP1']
-        args.n_fold = 1
+        args.n_fold = 0
         args.n_jobs = 2
 
     # Search for each dataset
