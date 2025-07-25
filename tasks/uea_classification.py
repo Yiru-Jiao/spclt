@@ -178,9 +178,14 @@ def main(args):
             test_data, test_labels = datautils.modify_train_data(test_data, test_labels)
             test_sim_mat = datautils.get_sim_mat(args.loader, test_data, dataset, args.dist_metric, prefix='test')
             test_soft_assignments = datautils.assign_soft_labels(test_sim_mat, args.tau_inst)
-            loss_results = model.compute_loss(test_data, test_soft_assignments, non_regularized=False)
-            loss_results = {'scl_loss': loss_results[0],
-                            'sp_loss': loss_results[2] if args.regularizer is not None else np.nan}
+            loss_comp = model.compute_loss(test_data, test_soft_assignments, non_regularized=False)
+            loss_results = {'scl_loss': loss_comp['loss_scl']}
+            if model.regularizer_config['reserve']=='topology':
+                loss_results['sp_loss'] = loss_comp['loss_topo_regularizer']
+            elif model.regularizer_config['reserve']=='geometry':
+                loss_results['sp_loss'] = loss_comp['loss_geo_regularizer']
+            elif model.regularizer_config['reserve'] is None:
+                loss_results['sp_loss'] = np.nan
 
             # Save evaluation results
             key_values = {**clf_clr_results, **loss_results, **local_dist_results, **global_dist_results}

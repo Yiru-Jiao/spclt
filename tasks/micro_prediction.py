@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100, help='The number of epochs')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to False)')
+    parser.add_argument('--reversed_list', type=int, default=0, help='Whether to reverse the list of models for evaluation (defaults to False)')
     args = parser.parse_args()
     args.reproduction = bool(args.reproduction)
     return args
@@ -73,7 +74,8 @@ def main(args):
 
     # Initialize evaluation results
     model_list = ['original', 'ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
-    pred_metrics = ['min_fde', 'mr_05', 'mr_1', 'mr_2']
+    if args.reversed_list:
+        model_list = model_list[::-1]
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
 
     def read_saved_results():
@@ -85,9 +87,9 @@ def main(args):
     if os.path.exists(results_dir):
         eval_results = read_saved_results()
     else:
-        metrics = pred_metrics + ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
+        metrics = ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
         metrics = metrics + ['finetuning_time', 'finetuning_epochs', 'finetuning_time_per_epoch']
-        eval_results = pd.DataFrame(np.zeros((len(model_list), 12), dtype=np.float32), columns=metrics,
+        eval_results = pd.DataFrame(np.zeros((len(model_list), len(metrics)), dtype=np.float32), columns=metrics,
                                     index=pd.MultiIndex.from_product([model_list,train_set], names=['model','dataset']))
         eval_results.to_csv(results_dir)
 

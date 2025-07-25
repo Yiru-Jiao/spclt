@@ -128,7 +128,20 @@ def main(args):
             elif args.prediction_model == 'GRU':
                 loader = 'MacroGRU'
             model_dir = f'./results/pretrain/{loader}/{model_type}/{dataset}/'
-            sp_encoder = utils_pre.define_encoder(loader, device, model_dir, continue_training=True)
+            if os.path.exists(f'{model_dir}/loss_log.csv'):
+                loss_log = pd.read_csv(f'{model_dir}/loss_log.csv')
+                if len(loss_log) >= 5:
+                    sp_encoder = utils_pre.define_encoder(loader, device, model_dir, continue_training=True)
+                else:
+                    print(f'****** {model_dir}/loss_log.csv is empty ******')
+                    sp_encoder = 'skip'
+            else:
+                print(f'****** {model_dir}/loss_log.csv does not exist ******')
+                sp_encoder = 'skip'
+        if sp_encoder == 'skip':
+            print(f'--- {model_type} does not have a pre-trained encoder, skipping ---')
+            continue
+
         learning_rate = 0.001
         if args.reproduction: # Reset the random seed for each run
             utils_pre.fix_seed(args.seed, deterministic=args.reproduction)

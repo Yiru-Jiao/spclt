@@ -484,7 +484,7 @@ class spclt():
         if non_regularized:
             return val_loss_comp['loss_scl']
         else:
-            return val_loss_comp.values()
+            return val_loss_comp
 
 
     def _eval_with_pooling(self, x, mask=None, slicing=None, encoding_window=None):
