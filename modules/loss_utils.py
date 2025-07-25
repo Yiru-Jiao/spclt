@@ -256,7 +256,7 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     D_tilde_inv = torch.diag_embed(1/d_i_tilde)
     I = torch.diag_embed(torch.ones(B, N, device=X.device))
     L = (D_tilde_inv@K_tilde - I)/(bandwidth/4)
-    print(f"nan in L: {torch.isnan(L).any()}, inf in L: {torch.isinf(L).any()}")
+    # print(f"nan in L: {torch.isnan(L).any()}, inf in L: {torch.isinf(L).any()}")
 
     return L # (B, N, N)
 

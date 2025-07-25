@@ -220,84 +220,108 @@ def main(args):
         params = default_params.copy()
 
         # TS2Vec (tau_inst=0, tau_temp=0, no regularizer)
+        to_search = True
         if 'TS2Vec_Phase1' in best_param_log:
-            params = use_best_params(best_param_log, 'TS2Vec_Phase1')
-            print(f'--- TS2Vec_Phase1 search already completed ---')
-        else:
+            if not np.isnan(best_param_log['TS2Vec_Phase1']['best_score']):
+                to_search = False
+        if to_search:
             params, best_score = search_best_params(['batch_size'], params, search_space, grid_search_args)
             best_param_log['TS2Vec_Phase1'] = params
             save_best_params(best_param_log, 'TS2Vec_Phase1', log_dir, best_score=best_score)
             print('--- TS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
+        else:
+            params = use_best_params(best_param_log, 'TS2Vec_Phase1')
+            print(f'--- TS2Vec_Phase1 search already completed ---')
 
         # TopoTS2Vec (tau_inst=0, tau_temp=0, topology regularizer)
         grid_search_args['fit_config'] = {'device': device, 'regularizer': 'topology', 'baseline': False}
 
+        to_search = True
         if 'TopoTS2Vec_Phase1' in best_param_log:
-            params = use_best_params(best_param_log, 'TopoTS2Vec_Phase1')
-            print(f'--- TopoTS2Vec_Phase1 search already completed ---')
-        else:
+            if not np.isnan(best_param_log['TopoTS2Vec_Phase1']['best_score']):
+                to_search = False
+        if to_search:
             params, best_score = search_best_params(['weight_lr'], params, search_space, grid_search_args)
             best_param_log['TopoTS2Vec_Phase1'] = params
             save_best_params(best_param_log, 'TopoTS2Vec_Phase1', log_dir, best_score=best_score)
             print('--- TopoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
+        else:
+            params = use_best_params(best_param_log, 'TopoTS2Vec_Phase1')
+            print(f'--- TopoTS2Vec_Phase1 search already completed ---')
 
         # GGeoTS2Vec (tau_inst=0, tau_temp=0, geometry regularizer)
         grid_search_args['fit_config'] = {'device': device, 'regularizer': 'geometry', 'baseline': False}
 
+        to_search = True
         if 'GGeoTS2Vec_Phase1' in best_param_log:
-            params = use_best_params(best_param_log, 'GGeoTS2Vec_Phase1')
-            print(f'--- GGeoTS2Vec_Phase1 hyperparameter search already completed ---')
-        else:
+            if not np.isnan(best_param_log['GGeoTS2Vec_Phase1']['best_score']):
+                to_search = False
+        if to_search:
             params, best_score = search_best_params(['bandwidth', 'weight_lr'], params, search_space, grid_search_args)
             best_param_log['GGeoTS2Vec_Phase1'] = params
             save_best_params(best_param_log, 'GGeoTS2Vec_Phase1', log_dir, best_score=best_score)
             print('--- GGeoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
+        else:
+            params = use_best_params(best_param_log, 'GGeoTS2Vec_Phase1')
+            print(f'--- GGeoTS2Vec_Phase1 hyperparameter search already completed ---')
 
         # SoftCLT (use soft labels, no regularizer)
         params = default_params.copy()
         grid_search_args['fit_config'] = {'device': device, 'regularizer': None, 'baseline': False}
 
+        to_search = True
         if 'SoftCLT_Phase1' in best_param_log:
-            params = use_best_params(best_param_log, 'SoftCLT_Phase1')
-            print(f'--- SoftCLT_Phase1 search already completed ---')
-        else:
+            if not np.isnan(best_param_log['SoftCLT_Phase1']['best_score']):
+                to_search = False
+        if to_search:
             params, best_score = search_best_params(['tau_temp', 'temporal_hierarchy'], params, search_space, grid_search_args)
             best_param_log['SoftCLT_Phase1'] = params
             save_best_params(best_param_log, log_dir, best_score=best_score)
             print('--- SoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
-
-        if 'SoftCLT_Phase2' in best_param_log:
-            params = use_best_params(best_param_log, 'SoftCLT_Phase2')
-            print(f'--- SoftCLT_Phase2 search already completed ---')
         else:
+            params = use_best_params(best_param_log, 'SoftCLT_Phase1')
+            print(f'--- SoftCLT_Phase1 search already completed ---')
+
+        if to_search:
             params, best_score = search_best_params(['tau_inst', 'batch_size'], params, search_space, grid_search_args)
             best_param_log['SoftCLT_Phase2'] = params
             save_best_params(best_param_log, 'SoftCLT_Phase2', log_dir, best_score=best_score)
             print('--- SoftCLT_Phase2 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
+        else:
+            params = use_best_params(best_param_log, 'SoftCLT_Phase2')
+            print(f'--- SoftCLT_Phase2 search already completed ---')
 
         # TopoSoftCLT (use soft labels, topology regularizer)
         grid_search_args['fit_config'] = {'device': device, 'regularizer': 'topology', 'baseline': False}
 
+        to_search = True
         if 'TopoSoftCLT_Phase1' in best_param_log:
-            params = use_best_params(best_param_log, 'TopoSoftCLT_Phase1')
-            print(f'--- TopoSoftCLT_Phase1 search already completed ---')
-        else:
+            if not np.isnan(best_param_log['TopoSoftCLT_Phase1']['best_score']):
+                to_search = False
+        if to_search:
             params, best_score = search_best_params(['weight_lr'], params, search_space, grid_search_args)
             best_param_log['TopoSoftCLT_Phase1'] = params
             save_best_params(best_param_log, 'TopoSoftCLT_Phase1', log_dir, best_score=best_score)
             print('--- TopoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
+        else:
+            params = use_best_params(best_param_log, 'TopoSoftCLT_Phase1')
+            print(f'--- TopoSoftCLT_Phase1 search already completed ---')
 
         # GGeoSoftCLT (use soft labels, geometry regularizer)
         grid_search_args['fit_config'] = {'device': device, 'regularizer': 'geometry', 'baseline': False}
 
+        to_search = True
         if 'GGeoSoftCLT_Phase1' in best_param_log:
-            params = use_best_params(best_param_log, 'GGeoSoftCLT_Phase1')
-            print(f'--- GGeoSoftCLT_Phase1 hyperparameter search already completed ---')
-        else:
+            if not np.isnan(best_param_log['GGeoSoftCLT_Phase1']['best_score']):
+                to_search = False
+        if to_search:
             params, best_score = search_best_params(['bandwidth', 'weight_lr'], params, search_space, grid_search_args)
             best_param_log['GGeoSoftCLT_Phase1'] = params
             save_best_params(best_param_log, 'GGeoSoftCLT_Phase1', log_dir, best_score=best_score)
             print('--- GGeoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
+        else:
+            params = use_best_params(best_param_log, 'GGeoSoftCLT_Phase1')
+            print(f'--- GGeoSoftCLT_Phase1 hyperparameter search already completed ---')
 
         print(f'--- {dataset} hyperparameter search completed, time elapsed : ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time()-start_time)) + ' ---')
         
