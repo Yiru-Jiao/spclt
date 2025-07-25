@@ -113,7 +113,7 @@ def main(args):
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         scheduler_heatmap = StepLR(optimizer, step_size=1, gamma=0.975)
         scheduler_epoch = ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=4, cooldown=0,
-                                            threshold=1e-3, threshold_mode='rel', min_lr=0.001*0.6**10)
+                                            threshold=1e-3, threshold_mode='rel', min_lr=0.001*0.6**50)
 
         # Train model if not already trained or if finetuning time is not recorded
         model_trained = os.path.exists(os.path.join(save_dir, f'decoder_{model_type}.pth'))
