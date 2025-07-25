@@ -260,8 +260,9 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     c = 1/4
 
     dist_XX = torch.cdist(X, X, p=2) # (B, N, N)
+    dist_XX = torch.where(dist_XX < 1e-6, 1e-6, dist_XX) # avoid division by zero
     K = torch.exp(-dist_XX**2 / bandwidth)
-    d_i = K.sum(dim=1)
+    d_i = K.sum(dim=1) # (B, N)
     D_inv = torch.diag_embed(1/d_i)
     K_tilde = D_inv @ K @ D_inv
     d_i_tilde = K_tilde.sum(dim=1)

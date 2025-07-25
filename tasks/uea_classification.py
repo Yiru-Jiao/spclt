@@ -154,6 +154,8 @@ def main(args):
             if args.reproduction: # Reset the random seed for each run
                 fix_seed(args.seed, deterministic=args.reproduction)
             model = spclt(args.loader, **model_config)
+            model.set_input_range(train_data)
+            assert 'x_max' in model.regularizer_config.keys()
             model.load(f'{model_dir}/{best_model}')
 
             # Evaluate the model

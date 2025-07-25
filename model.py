@@ -82,6 +82,7 @@ class spclt():
         Set the range of input data for regularization.
         Used in testing only.
         """
+        self.param_searching = False
         # exclude instances with all missing values
         isnanmat = np.isnan(train_data)
         while isnanmat.ndim > 1:
@@ -522,16 +523,10 @@ class spclt():
             val_loss_comp[key] = (val_loss_comp[key] / val_batch_iter).item()
 
         if non_regularized:
-            if self.regularizer_config['reserve'] is None:
-                return val_loss_comp['loss_scl']
-            elif self.regularizer_config['reserve'] == 'topology':
-                if np.isnan(val_loss_comp['loss_topo_regularizer']):
-                    return 1e8
-                return val_loss_comp['loss_scl']
-            elif self.regularizer_config['reserve'] == 'geometry':
-                if np.isnan(val_loss_comp['loss_geo_regularizer']):
-                    return 1e8
-                return val_loss_comp['loss_scl']
+            if self.regularizer_config['reserve'] == 'geometry':
+                if not val_loss_comp['loss_geo_regularizer'] > -1e6:
+                    return np.nan
+            return val_loss_comp['loss_scl']
         else:
             return val_loss_comp
 
