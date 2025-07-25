@@ -102,12 +102,11 @@ def main(args):
         eval_results = eval_results.set_index(['model', 'epoch'])
         return eval_results
 
-    pred_metrics = ['mae', 'rmse', 'error_std', 'explained_variance'] # Prediction-based
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
     if os.path.exists(results_dir):
         eval_results = read_saved_results()
     else:
-        eval_results = pd.DataFrame(np.zeros((len(model_list)*int(EPOCH_NUMBER/6), 4), dtype=np.float32), columns=pred_metrics,
+        eval_results = pd.DataFrame(np.zeros((len(model_list)*int(EPOCH_NUMBER/6), len(knn_metrics)), dtype=np.float32), columns=knn_metrics,
                                     index=pd.MultiIndex.from_product([model_list, list(range(int(EPOCH_NUMBER/6)))], names=['model', 'epoch']))
         eval_results.to_csv(results_dir)
 

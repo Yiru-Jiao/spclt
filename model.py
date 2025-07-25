@@ -293,7 +293,6 @@ class spclt():
 
         # determine range of input
         # train_data: [n_instances, n_timestamps, output_dims], x_max: [n_timestamps, output_dims]
-        # x_min.unsqueeze(0): [1, n_timestamps, output_dims]
         train_data_copy = train_data.copy()
         # replace nan, inf, and -inf with 0
         train_data_copy = np.nan_to_num(train_data_copy, nan=0.0, posinf=0.0, neginf=0.0)

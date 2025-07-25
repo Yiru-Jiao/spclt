@@ -146,9 +146,12 @@ def topo_loss(model, x, x_max=None, x_min=None):
 
     # compute and normalize distances in the original sapce and latent space
     x_distances = topo_euclidean_distance_matrix(x, x_max, x_min) # (B, N, N)
-    x_distances = x_distances / max(x_distances.max(), 1e-6)
+    if x_distances.max() == 0:
+        x_distances = x_distances + 1.
+    else:
+        x_distances = x_distances / x_distances.max()
     latent_distances = topo_euclidean_distance_matrix(latent) # (B, N, N)
-    latent_distances = latent_distances / max(latent_distances.max(), 1e-6)
+    latent_distances = latent_distances / latent_distances.max()
 
     # compute topological signature distance
     topo_sig = TopologicalSignatureDistance()
@@ -183,5 +186,5 @@ def geo_loss(model, x, x_max=None, x_min=None, bandwidth=1.):
         distortion, n = relaxed_distortion_measure_JGinvJT(L, latent, node_chunk=256, k_chunk=256)
 
     # Normalize distortion
-    iso_loss = distortion / n + 1.
+    iso_loss = (distortion + n) / n
     return iso_loss

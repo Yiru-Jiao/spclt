@@ -76,28 +76,12 @@ def timelag_sigmoid(z1, sigma=1):
 ## functions and classes for topology preserving regularizer ##
 ###############################################################
 
-def tensor_norm_ts(TS, TS_max=None, TS_min=None):
-    """
-    Normalize a time series tensor per feature.
-    """
-    TS = torch.nan_to_num(TS, nan=0.0, posinf=1e8, neginf=-1e8)  # replace NaN and inf values
-    if TS_max is None or TS_min is None:
-        TS_max, _ = torch.max(TS, dim=0, keepdim=True)
-        TS_min, _ = torch.min(TS, dim=0, keepdim=True)
-    else:
-        TS_max = TS_max.unsqueeze(0)
-        TS_min = TS_min.unsqueeze(0)
-    TS_range = TS_max - TS_min
-    TS = (TS - TS_min) / torch.where(TS_range < 1e-6, 1, TS_range)
-    return TS
-
-
 def topo_euclidean_distance_matrix(x, x_max=None, x_min=None, p=2):
     """
     Computes the pairwise Euclidean distance matrix between the rows of a 2D tensor.
     """
-    x = tensor_norm_ts(x, x_max, x_min)
     x_flat = x.view(x.size(0), -1)
+    x_flat = torch.nan_to_num(x_flat, nan=0.0, posinf=1e8, neginf=-1e8)  # replace NaN and inf values
     distances = torch.norm(x_flat[:, None] - x_flat, dim=2, p=p)
     return distances
 
@@ -252,15 +236,18 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     """
     Calculate the Normalized Graph Laplacian for a given set of data points.
     """
-    X = tensor_norm_ts(X, X_max, X_min)
-
     if X.ndim == 4:
         X = X.contiguous().view(X.size(0), X.size(2), -1) # use N as the number of nodes (193) for MacroTraffic
     B, N, _ = X.shape                                     # use N as the number of road users (26) for MicroTraffic
-    c = 1/4
 
+    # adjust bandwidth according to the data range
+    if X_max is not None and X_min is not None: # [N, output_dims]
+        hat_range = torch.median(torch.sum((X_max-X_min)**2, dim=-1).sqrt()) # (N,)
+        if hat_range > 0:
+            bandwidth = bandwidth * hat_range
+    
+    X = torch.nan_to_num(X, nan=0.0, posinf=1e8, neginf=-1e8)  # replace NaN and inf values
     dist_XX = torch.cdist(X, X, p=2) # (B, N, N)
-    dist_XX = torch.where(dist_XX < 1e-6, 1e-6, dist_XX) # avoid division by zero
     K = torch.exp(-dist_XX**2 / bandwidth)
     d_i = K.sum(dim=1) # (B, N)
     D_inv = torch.diag_embed(1/d_i)
@@ -268,7 +255,8 @@ def get_laplacian(X, X_max=None, X_min=None, bandwidth=1.): # bandwidth tuning s
     d_i_tilde = K_tilde.sum(dim=1)
     D_tilde_inv = torch.diag_embed(1/d_i_tilde)
     I = torch.diag_embed(torch.ones(B, N, device=X.device))
-    L = (D_tilde_inv@K_tilde - I)/(c*bandwidth)
+    L = (D_tilde_inv@K_tilde - I)/(bandwidth/4)
+    print(f"nan in L: {torch.isnan(L).any()}, inf in L: {torch.isinf(L).any()}")
 
     return L # (B, N, N)
 
