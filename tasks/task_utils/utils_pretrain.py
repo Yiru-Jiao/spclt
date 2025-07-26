@@ -66,7 +66,7 @@ def fix_seed(seed, deterministic=False):
     torch.backends.cudnn.benchmark = False
 
 
-def init_dl_program(gpu_num=0, max_threads=None, use_tf32=False):
+def init_dl_program(gpu_num=0, max_threads=None, use_tf32=True):
 
     if max_threads is not None:
         torch.set_num_threads(max_threads)  # intraop
@@ -100,7 +100,10 @@ def init_dl_program(gpu_num=0, max_threads=None, use_tf32=False):
             torch.cuda.set_device(torch_device)
     devices.reverse()
 
+    torch.set_float32_matmul_precision('high')
     if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cuda.enable_mem_efficient_sdp(True)
         torch.backends.cudnn.enabled = True
         if hasattr(torch.backends.cudnn, 'allow_tf32'):
             torch.backends.cudnn.allow_tf32 = use_tf32
