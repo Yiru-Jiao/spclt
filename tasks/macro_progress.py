@@ -189,7 +189,7 @@ def main(args):
             epoch_indecies = epoch_indecies[::-1]
             progress_list = progress_list[::-1]
         for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, dynamic_ncols=False,miniters=10, total=len(progress_list)):
-            if eval_results.loc[(model_type, epoch_index), 'mae'] > 0 and args.prediction_model != 'DGCN':
+            if eval_results.loc[(model_type, epoch_index), 'mean_shared_neighbours'] > 0 and args.prediction_model != 'DGCN':
                 print(f'--- {model_type}-{epoch_index} has been evaluated, skipping evaluation ---')
                 continue
             model.load_state_dict(torch.load(epoch_path, map_location=device, weights_only=True))
