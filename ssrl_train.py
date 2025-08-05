@@ -34,6 +34,7 @@ def parse_args():
     args.tau_temp = 0
     args.temporal_hierarchy = None
     args.regularizer = None
+    args.baseline = False
     args.bandwidth = 1.
     args.iters = None
     args.epochs = 100
@@ -70,9 +71,8 @@ def main(args):
     os.makedirs('results/evaluation', exist_ok=True)
 
     # Read the dataset list
-    if args.loader == 'UEA':
-        dataset_dir = os.path.join('datasets/', args.loader)
-        dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
+    if 'UEA' in args.loader:
+        dataset_list = [entry.name for entry in os.scandir('datasets/UEA') if entry.is_dir()]
         dataset_list.sort()
     elif 'Macro' in args.loader:
         dataset_list = [['2019']]
@@ -82,7 +82,11 @@ def main(args):
         raise ValueError(f"Unknown dataset loader: {args.loader}")
 
     # Initialize evaluation dataframe for training efficiency
-    model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.loader == 'UEA_revision1':
+        model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
+                      'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
+    else:
+        model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
 
     def read_saved_results():
         eval_results = pd.read_csv(results_dir)
@@ -163,8 +167,14 @@ def main(args):
                         print(f'--- {model_type} {dataset} has been trained (==epochs), skipping evaluation ---')
                         continue
             # Set hyperparameters and configure model
+            if 'baseline' in model_type:
+                args.baseline = True
+                para2load = model_type.split('-base')[0]
+            else:
+                args.baseline = False
+                para2load = model_type
             try:
-                args = load_tuned_hyperparameters(args, tuned_params, model_type)
+                args = load_tuned_hyperparameters(args, tuned_params, para2load)
             except:
                 print(f'****** {model_type} hyperparameters not found ******')
                 continue

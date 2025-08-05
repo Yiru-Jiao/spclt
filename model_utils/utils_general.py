@@ -171,6 +171,7 @@ def configure_model(args, input_dims, device):
     # Define regularizer configuration
     regularizer_config = dict(
         reserve=args.regularizer,
+        baseline=args.baseline,
         bandwidth=args.bandwidth,
     )
 

@@ -199,7 +199,7 @@ def main(args):
                             'indexed_sim_mat': indexed_sim_mat,
                             'n_fold': args.n_fold if dataset not in ['EigenWorms','MotorImagery'] else 0,
                             'n_jobs': args.n_jobs if dataset not in ['EigenWorms','MotorImagery'] else 1,
-                            'fit_config': {'device': device, 'regularizer': None}}
+                            'fit_config': {'device': device, 'regularizer': None, 'baseline': False}}
 
         # Initialize the dict of parameters
         params = default_params.copy()
@@ -215,7 +215,7 @@ def main(args):
             print('--- TS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # TopoTS2Vec (tau_inst=0, tau_temp=0, topology regularizer)
-        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'topology'}
+        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'topology', 'baseline': False}
 
         if 'TopoTS2Vec_Phase1' in best_param_log:
             params = use_best_params(best_param_log, 'TopoTS2Vec_Phase1')
@@ -227,7 +227,7 @@ def main(args):
             print('--- TopoTS2Vec_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # GGeoTS2Vec (tau_inst=0, tau_temp=0, geometry regularizer)
-        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'geometry'}
+        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'geometry', 'baseline': False}
 
         if 'GGeoTS2Vec_Phase1' in best_param_log:
             params = use_best_params(best_param_log, 'GGeoTS2Vec_Phase1')
@@ -240,7 +240,7 @@ def main(args):
 
         # SoftCLT (use soft labels, no regularizer)
         params = default_params.copy()
-        grid_search_args['fit_config'] = {'device': device, 'regularizer': None}
+        grid_search_args['fit_config'] = {'device': device, 'regularizer': None, 'baseline': False}
         
         if 'SoftCLT_Phase1' in best_param_log:
             params = use_best_params(best_param_log, 'SoftCLT_Phase1')
@@ -261,7 +261,7 @@ def main(args):
             print('--- SoftCLT_Phase2 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # TopoSoftCLT (use soft labels, topology regularizer)
-        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'topology'}
+        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'topology', 'baseline': False}
         
         if 'TopoSoftCLT_Phase1' in best_param_log:
             params = use_best_params(best_param_log, 'TopoSoftCLT_Phase1')
@@ -273,7 +273,7 @@ def main(args):
             print('--- TopoSoftCLT_Phase1 | time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - start_time)) + f' | best score: {best_score} ---')
 
         # GGeoSoftCLT (use soft labels, geometry regularizer)
-        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'geometry'}
+        grid_search_args['fit_config'] = {'device': device, 'regularizer': 'geometry', 'baseline': False}
 
         if 'GGeoSoftCLT_Phase1' in best_param_log:
             params = use_best_params(best_param_log, 'GGeoSoftCLT_Phase1')

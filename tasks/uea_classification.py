@@ -23,6 +23,7 @@ from tasks.task_utils.svm_eval import eval_classification
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--loader', type=str, required=True, help='The data loader used to load the experimental data. This can be set to UCR, UEA, INT')
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
@@ -30,7 +31,6 @@ def parse_args():
     args.reproduction = bool(args.reproduction)
 
     # Set default parameters
-    args.loader = 'UEA'
     args.dist_metric = 'DTW'
     args.sliding_padding = 0
     args.repr_dims = 320
@@ -38,6 +38,7 @@ def parse_args():
     args.tau_temp = 0
     args.temporal_hierarchy = None
     args.regularizer = None
+    args.baseline = False
     args.bandwidth = 1.
     args.iters = None
     args.epochs = 100
@@ -79,7 +80,11 @@ def main(args):
     dataset_list.sort()
 
     # Initialize evaluation dataframe for UEA classification
-    model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.loader == 'UEA':
+        model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    elif args.loader == 'UEA_revision1':
+        model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
+                      'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
     clf_clr_metrics = ['svm_acc', 'svm_auprc'] # Classification results
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
 
@@ -123,7 +128,17 @@ def main(args):
             os.makedirs(model_dir, exist_ok=True)
 
             # Set hyperparameters and configure model
-            args = load_tuned_hyperparameters(args, tuned_params, model_type)
+            if 'baseline' in model_type:
+                args.baseline = True
+                para2load = model_type.split('-base')[0]
+            else:
+                args.baseline = False
+                para2load = model_type
+            try:
+                args = load_tuned_hyperparameters(args, tuned_params, para2load)
+            except:
+                print(f'****** {model_type} hyperparameters not found ******')
+                continue
             model_config = configure_model(args, feature_size, device)
 
             # Load the best model for evaluation

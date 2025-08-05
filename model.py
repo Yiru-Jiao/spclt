@@ -70,6 +70,9 @@ class spclt():
             self.loss_log_vars = torch.nn.Parameter(torch.zeros(3, device=self.device))
         elif self.regularizer_config['reserve'] in ['topology', 'geometry']:
             self.loss_log_vars = torch.nn.Parameter(torch.zeros(2, device=self.device))
+        if self.regularizer_config['baseline']:
+            # let log(sigma^2) = 0, i.e., exp(-log(sigma^2)) = 1 and thus coefficient = 0.5
+            self.loss_log_vars = torch.zeros(2, device=self.device, requires_grad=False)
         
         # define callback functions
         self.after_iter_callback = after_iter_callback
@@ -86,7 +89,7 @@ class spclt():
             self.loss_log_vars.requires_grad = False
 
     def train(self,):
-        if self.regularizer_config['reserve'] is None:
+        if self.regularizer_config['reserve'] is None or self.regularizer_config['baseline']:
             self._net.train()
             self.net.train()
         else:
@@ -227,7 +230,7 @@ class spclt():
                 threshold=1e-3, threshold_mode='rel', min_lr=self.lr*0.6**15
                 )
             
-            if self.regularizer_config['reserve'] is not None:
+            if self.regularizer_config['reserve'] is not None and not self.regularizer_config['baseline']:
                 self.scheduler_weight = torch.optim.lr_scheduler.ReduceLROnPlateau(
                     self.optimizer_weight, mode='min', factor=0.6, patience=patience, cooldown=cool_down_weight,
                     threshold=1e-3, threshold_mode='rel', min_lr=self.weight_lr*0.6**15
@@ -647,3 +650,5 @@ class spclt():
             state_loss_log_vars = np.load(fn+'_loss_log_vars.npy')
             state_loss_log_vars = torch.from_numpy(state_loss_log_vars).to(self.device)
             self.loss_log_vars = torch.nn.Parameter(state_loss_log_vars, requires_grad=False)
+        if self.regularizer_config['baseline']:
+            self.loss_log_vars = torch.zeros(2, device=self.device, requires_grad=False)
