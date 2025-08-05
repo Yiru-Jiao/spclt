@@ -102,12 +102,11 @@ def main(args):
         eval_results = eval_results.set_index(['model', 'epoch'])
         return eval_results
 
-    pred_metrics = ['mae', 'rmse', 'error_std', 'explained_variance'] # Prediction-based
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
     if os.path.exists(results_dir):
         eval_results = read_saved_results()
     else:
-        eval_results = pd.DataFrame(np.zeros((len(model_list)*int(EPOCH_NUMBER/6), 4), dtype=np.float32), columns=pred_metrics,
+        eval_results = pd.DataFrame(np.zeros((len(model_list)*int(EPOCH_NUMBER/6), 1), dtype=np.float32), columns=['mae (mean)'],
                                     index=pd.MultiIndex.from_product([model_list, list(range(int(EPOCH_NUMBER/6)))], names=['model', 'epoch']))
         eval_results.to_csv(results_dir)
 
@@ -161,8 +160,11 @@ def main(args):
         progress_list = sorted(progress_list, key=lambda x: int(x.split('ckpt_')[1].split('.pth')[0]))
         initial_file_saved_time = os.path.getmtime(progress_list[0])
         epoch_indecies = [int(epoch_path.split('ckpt_')[1].split('.pth')[0]) for epoch_path in progress_list]
+        # Evaluate models in reverse order
+        epoch_indecies = epoch_indecies[::-1]
+        progress_list = progress_list[::-1]
         for epoch_path, epoch_index in tqdm(zip(progress_list, epoch_indecies), desc=f'Evaluating {model_type}', ascii=True, miniters=10, total=len(progress_list)):
-            if eval_results.loc[(model_type, epoch_index), 'mae'] > 0 and args.prediction_model != 'DGCN':
+            if eval_results.loc[(model_type, epoch_index), 'mae (mean)'] > 0:
                 print(f'--- {model_type}-{epoch_index} has been evaluated, skipping evaluation ---')
                 continue
             model.load_state_dict(torch.load(epoch_path, map_location=device, weights_only=True))
@@ -173,10 +175,31 @@ def main(args):
             ## Prediction evaluation, scale back to original values (km/h)
             prediction = prediction[...,0]*130 # (N, 15, 193, 1)
             X = testset.X[:,-15:,:,0]*130 # (N, 15, 193, 1)
-            pred_results = {'mae': np.mean(np.abs(prediction-X)),
-                            'rmse': np.mean((prediction-X)**2)**0.5,
-                            'error_std': np.std(prediction-X),
-                            'explained_variance': 1-np.var(prediction-X)/np.var(X)}
+
+            ## Bootstrap evaluation
+            n_fold = 10
+            mae_list = np.zeros(n_fold, dtype=np.float32)
+            rmse_list = np.zeros(n_fold, dtype=np.float32)
+            error_std_list = np.zeros(n_fold, dtype=np.float32)
+            explained_variance_list = np.zeros(n_fold, dtype=np.float32)
+            random_indices = np.arange(len(prediction))
+            np.random.RandomState(args.seed).shuffle(random_indices)
+            for i in range(n_fold):
+                indices = random_indices[i*len(prediction)//n_fold:(i+1)*len(prediction)//n_fold]
+                pred = prediction[indices]
+                x = X[indices]
+                mae_list[i] = np.mean(np.abs(pred - x))
+                rmse_list[i] = np.mean((pred - x)**2)**0.5
+                error_std_list[i] = np.std(pred - x)
+                explained_variance_list[i] = 1 - np.var(pred - x) / np.var(x)
+            pred_results = {'mae (mean)': np.mean(mae_list),
+                            'mae (std)': np.std(mae_list),
+                            'rmse (mean)': np.mean(rmse_list),
+                            'rmse (std)': np.std(rmse_list),
+                            'error_std (mean)': np.mean(error_std_list),
+                            'error_std (std)': np.std(error_std_list),
+                            'explained_variance (mean)': np.mean(explained_variance_list),
+                            'explained_variance (std)': np.std(explained_variance_list)}
 
             ## Encoding evaluation
             test_labels = np.zeros(test_data.shape[0])
