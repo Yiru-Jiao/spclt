@@ -23,7 +23,7 @@ from tasks.task_utils.svm_eval import eval_classification
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--loader', type=str, required=True, help='The data loader used to load the experimental data. This can be set to UCR, UEA, INT')
+    parser.add_argument('--loader', type=str, default='UEA', help='The data loader used to load the experimental data.')
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
@@ -78,9 +78,9 @@ def main(args):
     dataset_list = [entry.name for entry in os.scandir('datasets/UEA') if entry.is_dir()]
     dataset_list.sort()
     if args.loader == 'UEA_additional':
-        large_datasets = ['CharacterTrajectories', 'EigenWorms', 'LSST', 
-                          'EthanolConcentration', 'FaceDetection', 'MotorImagery', 
-                          'PhonemeSpectra', 'SelfRegulationSCP1', 'SelfRegulationSCP2', 'SpokenArabicDigits']
+        large_datasets = ['ArticularyWordRecognition', 'CharacterTrajectories', 'Cricket', 'EigenWorms', 'LSST', 'PEMS-SF', # spatial time series
+                          'EthanolConcentration', 'FaceDetection', 'FingerMovements', 'Heartbeat', 'MotorImagery', # non-spatial time series
+                          'PhonemeSpectra', 'SelfRegulationSCP1', 'SelfRegulationSCP2', 'SpokenArabicDigits'] # in total 15 datasets are left out
         dataset_list = [dataset for dataset in dataset_list if dataset not in large_datasets]
 
     # Initialize evaluation dataframe for UEA classification
@@ -96,14 +96,18 @@ def main(args):
     clf_clr_metrics = ['svm_acc', 'svm_auprc'] # Classification results
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
 
-    def read_saved_results():
+    def read_saved_results(loader, results_dir):
+        if loader == 'UEA':
+            index_cols = ['model', 'dataset']
+        elif loader == 'UEA_additional':
+            index_cols = ['model', 'dataset', 'rseed']
         eval_results = pd.read_csv(results_dir)
-        eval_results['dataset'] = eval_results['dataset'].astype(str)
-        eval_results = eval_results.set_index(['model', 'dataset'])
+        eval_results[['model','dataset']] = eval_results[['model','dataset']].astype(str)
+        eval_results = eval_results.set_index(index_cols)
         return eval_results
 
     if os.path.exists(results_dir):
-        eval_results = read_saved_results()
+        eval_results = read_saved_results(args.loader, results_dir)
     else:
         metrics = clf_clr_metrics + ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
         if args.loader == 'UEA':
@@ -112,7 +116,8 @@ def main(args):
         elif args.loader == 'UEA_additional':
             eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list)*len(random_seeds), len(metrics)), dtype=np.float32), columns=metrics,
                                         index=pd.MultiIndex.from_product([model_list,dataset_list,random_seeds], names=['model','dataset','rseed']))
-        eval_results.to_csv(results_dir)
+    eval_results = eval_results.sort_index()
+    eval_results.to_csv(results_dir)
 
     # Evaluate for each dataset
     for dataset in dataset_list:
@@ -141,7 +146,7 @@ def main(args):
                     continue
 
                 if args.loader == 'UEA_additional':
-                    model_dir = os.path.join(run_dir, f'seed_{rseed}/{model_type}/{dataset}')
+                    model_dir = os.path.join(run_dir, f'{model_type}/seed_{rseed}/{dataset}')
                 else:
                     model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
                 os.makedirs(model_dir, exist_ok=True)
@@ -161,7 +166,10 @@ def main(args):
                 model_config = configure_model(args, feature_size, device)
 
                 # Load the best model for evaluation
-                if os.path.exists(f'{model_dir}/loss_log.csv'):
+                loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
+                existing_models = glob.glob(f'{model_dir}/*_net.pth')
+                trained_model_exist = len(existing_models) > 0
+                if loss_log_exist or trained_model_exist:
                     print(f'--- {model_type} {dataset} has been trained, loading final model ---')
                     existing_models = glob.glob(f'{model_dir}/*_net.pth')
                     best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
@@ -201,7 +209,7 @@ def main(args):
                 key_values = {**clf_clr_results, **loss_results, **local_dist_results, **global_dist_results}
                 keys = list(key_values.keys())
                 values = np.array(list(key_values.values())).astype(np.float32)
-                eval_results = read_saved_results() # read saved results again to avoid overwriting
+                eval_results = read_saved_results(args.loader, results_dir) # read saved results again to avoid overwriting
                 eval_results.loc[multi_index, keys] = values
                 eval_results.loc[multi_index, 'inference_time'] = acc['inference_time']
                 eval_results.loc[multi_index, 'num_samples'] = acc['num_samples']
@@ -209,6 +217,8 @@ def main(args):
                 # Save evaluation results per dataset and model
                 eval_results.to_csv(results_dir)
 
+    eval_results['num_samples'] = eval_results['num_samples'].astype(int)
+    eval_results.to_csv(results_dir)
     print('--- Total time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - initial_time)) + ' ---')
     sys.exit(0)
 

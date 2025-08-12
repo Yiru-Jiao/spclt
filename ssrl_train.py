@@ -76,10 +76,10 @@ def main(args):
         dataset_list = [entry.name for entry in os.scandir('datasets/UEA') if entry.is_dir()]
         dataset_list.sort()
         if args.loader == 'UEA_additional':
-            large_datasets = ['CharacterTrajectories', 'EigenWorms', 'LSST', 
-                              'EthanolConcentration', 'FaceDetection', 'MotorImagery', 
-                              'PhonemeSpectra', 'SelfRegulationSCP1', 'SelfRegulationSCP2', 'SpokenArabicDigits']
-            dataset_list = [dataset for dataset in dataset_list if dataset not in large_datasets]
+            large_datasets = ['ArticularyWordRecognition', 'CharacterTrajectories', 'Cricket', 'EigenWorms', 'LSST', 'PEMS-SF', # spatial time series
+                              'EthanolConcentration', 'FaceDetection', 'FingerMovements', 'Heartbeat', 'MotorImagery', # non-spatial time series
+                              'PhonemeSpectra', 'SelfRegulationSCP1', 'SelfRegulationSCP2', 'SpokenArabicDigits'] # in total 15 datasets are left out
+            dataset_list = [dataset for dataset in dataset_list if dataset not in large_datasets] # in total 13 datasets are used for additional experiments
     elif 'Macro' in args.loader:
         dataset_list = [['2019']]
     elif args.loader == 'MicroTraffic':
@@ -172,9 +172,12 @@ def main(args):
         else:
             random_seeds = [args.seed]
         for rseed in random_seeds:
-            fix_seed(rseed, deterministic=args.reproduction)
-            print(f'--- Training with random seed {rseed} ---')
             for model_type in model_list:
+                if args.loader == 'UEA_additional':
+                    # For complete reproducibility across multiple runs of the script,
+                    # repeatedly fix the random seed for each model and dataset
+                    fix_seed(rseed, deterministic=args.reproduction)
+                    print(f'--- Training under random seed {rseed} ---')
                 # Set hyperparameters and configure model
                 if 'baseline' in model_type:
                     args.baseline = True
@@ -190,16 +193,16 @@ def main(args):
                 model_config = configure_model(args, feature_size, device)
 
                 if args.loader == 'UEA_additional':
-                    model_dir = os.path.join(run_dir, f'seed_{rseed}/{model_type}/{dataset}')
+                    model_dir = os.path.join(run_dir, f'{model_type}/seed_{rseed}/{dataset}')
                 else:
                     model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
                 os.makedirs(model_dir, exist_ok=True)
 
                 # Train model if not already trained or if training time is not recorded
                 loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
-                if not loss_log_exist:
-                    to_train = True
-                else:
+                existing_models = glob.glob(f'{model_dir}/*_net.pth')
+                trained_model_exist = len(existing_models) > 0
+                if loss_log_exist or trained_model_exist:
                     to_train = False
                     if args.loader != 'UEA_additional':
                         eval_results = read_saved_results()
@@ -209,6 +212,10 @@ def main(args):
                             print(f'--- {model_type} {dataset} has been trained, skip training ---')
                         else:
                             to_train = True
+                    else:
+                        print(f'--- {model_type} {dataset} has been trained, skip training ---')
+                else:
+                    to_train = True
 
                 if to_train:
                     # Create model
@@ -224,7 +231,8 @@ def main(args):
                     training_epochs = model.epoch_n
 
                     # Save loss log
-                    save_loss_log(loss_log, model_dir, regularizer=args.regularizer)
+                    if args.loader != 'UEA_additional':
+                        save_loss_log(loss_log, model_dir, regularizer=args.regularizer)
                     print(f'Training time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(training_time)))
                 
                 # Reserve the latest model and remove the rest
