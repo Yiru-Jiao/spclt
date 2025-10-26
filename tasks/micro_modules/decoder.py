@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from micro_modules.utils_micro import *
-from micro_modules.baselayers import *
+from tasks.micro_modules.utils_micro import *
+from tasks.micro_modules.baselayers import *
 
 
 class VectorDecoder(nn.Module):

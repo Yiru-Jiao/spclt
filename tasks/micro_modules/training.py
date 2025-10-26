@@ -2,8 +2,8 @@ import os
 import sys
 from tqdm import tqdm
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from micro_modules.utils_micro import *
-from micro_modules.interaction_dataset import *
+from tasks.micro_modules.utils_micro import *
+from tasks.micro_modules.interaction_dataset import *
 
 
 def train_one_epoch(epoch_index, batch_size, model, optimizer, loss_2, training_loader, scheduler, mode):
