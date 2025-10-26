@@ -27,7 +27,7 @@ class trainer():
             setattr(self, key, value)
         return self
 
-    def define_encoder(self, loader, sim_mat, input_dims, device, regularizer=None):
+    def define_encoder(self, loader, sim_mat, input_dims, device, regularizer=None, baseline=False):
         self.model_config = dict(
             input_dims = input_dims,
             output_dims = 320,
@@ -43,6 +43,7 @@ class trainer():
                 temporal_hierarchy = self.temporal_hierarchy),
             regularizer_config = dict(
                 reserve = regularizer,
+                baseline = baseline,
                 bandwidth = self.bandwidth),
             encode_args = dict(),
             )

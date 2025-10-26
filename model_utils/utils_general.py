@@ -171,11 +171,12 @@ def configure_model(args, input_dims, device):
     # Define regularizer configuration
     regularizer_config = dict(
         reserve=args.regularizer,
+        baseline=args.baseline,
         bandwidth=args.bandwidth,
     )
 
     # Define representation encoding arguments
-    if args.loader == 'UEA':
+    if 'UEA' in args.loader:
         encode_args = dict(encoding_window='full_series') # n_instances x output_dims
     elif 'Macro' in args.loader or 'Micro' in args.loader:
         encode_args = dict() # this encoding does not require new arguments

@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 
 
 class AMSdataset(Dataset):
-    def __init__(self, years, para, stage='train', device='cuda:0'):
+    def __init__(self, years, para, stage='train', device='cuda:0', data_dir='./datasets/MacroTraffic/'):
         self.para = para
         self.interval = para['time_invertal']
         self.Tout = para['horizon']
@@ -16,7 +16,7 @@ class AMSdataset(Dataset):
         X = []
         print(f'preprocessing {stage} data...')
         for year in years:
-            dt = zarr.open('./datasets/MacroTraffic/'+year+'.zarr')
+            dt = zarr.open(data_dir+year+'.zarr')
             xf = get_data(dt, self.Tout, self.Tin, self.interval, self.stage)
             X.append(xf)
 
@@ -34,6 +34,7 @@ class AMSdataset(Dataset):
 def get_data(dt, tout, tin, interval, stage):
 
     x = []
+    print(dt)
     V_morning = np.transpose(dt.speed_morning, (0,2,1))
     V_evening = np.transpose(dt.speed_evening, (0,2,1))
     Q_morning = np.transpose(dt.flow_morning, (0,2,1))

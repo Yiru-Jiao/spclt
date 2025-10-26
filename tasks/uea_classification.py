@@ -23,6 +23,7 @@ from tasks.task_utils.svm_eval import eval_classification
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--loader', type=str, default='UEA', help='The data loader used to load the experimental data.')
     parser.add_argument('--gpu', type=str, default='0', help='The gpu number to use for training and inference (defaults to 0 for CPU only, can be "1,2" for multi-gpu)')
     parser.add_argument('--seed', type=int, default=None, help='The random seed')
     parser.add_argument('--reproduction', type=int, default=1, help='Whether this run is for reproduction, if set to True, the random seed would be fixed (defaults to True)')
@@ -30,7 +31,6 @@ def parse_args():
     args.reproduction = bool(args.reproduction)
 
     # Set default parameters
-    args.loader = 'UEA'
     args.dist_metric = 'DTW'
     args.sliding_padding = 0
     args.repr_dims = 320
@@ -38,6 +38,7 @@ def parse_args():
     args.tau_temp = 0
     args.temporal_hierarchy = None
     args.regularizer = None
+    args.baseline = False
     args.bandwidth = 1.
     args.iters = None
     args.epochs = 100
@@ -74,28 +75,49 @@ def main(args):
     os.makedirs(f'results/evaluation/', exist_ok=True)
 
     # Read the dataset list
-    dataset_dir = os.path.join('datasets/', args.loader)
-    dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
+    dataset_list = [entry.name for entry in os.scandir('datasets/UEA') if entry.is_dir()]
     dataset_list.sort()
+    if args.loader == 'UEA_additional':
+        large_datasets = ['ArticularyWordRecognition', 'CharacterTrajectories', 'Cricket', 'EigenWorms', 'LSST', 'PEMS-SF', # spatial time series
+                          'EthanolConcentration', 'FaceDetection', 'FingerMovements', 'Heartbeat', 'MotorImagery', # non-spatial time series
+                          'PhonemeSpectra', 'SelfRegulationSCP1', 'SelfRegulationSCP2', 'SpokenArabicDigits'] # in total 15 datasets are left out
+        dataset_list = [dataset for dataset in dataset_list if dataset not in large_datasets]
 
     # Initialize evaluation dataframe for UEA classification
-    model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.loader == 'UEA_additional':
+        model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
+                      'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
+        random_seeds = np.random.RandomState(args.seed).randint(100, 999, size=10)
+        print(f'---- Random seed list: {random_seeds} ----')
+    else:
+        model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+        random_seeds = [args.seed]
+    
     clf_clr_metrics = ['svm_acc', 'svm_auprc'] # Classification results
     knn_metrics = ['mean_shared_neighbours', 'mean_dist_mrre', 'mean_trustworthiness', 'mean_continuity'] # kNN-based, averaged over various k
 
-    def read_saved_results():
+    def read_saved_results(loader, results_dir):
+        if loader == 'UEA':
+            index_cols = ['model', 'dataset']
+        elif loader == 'UEA_additional':
+            index_cols = ['model', 'dataset', 'rseed']
         eval_results = pd.read_csv(results_dir)
-        eval_results['dataset'] = eval_results['dataset'].astype(str)
-        eval_results = eval_results.set_index(['model', 'dataset'])
+        eval_results[['model','dataset']] = eval_results[['model','dataset']].astype(str)
+        eval_results = eval_results.set_index(index_cols)
         return eval_results
 
     if os.path.exists(results_dir):
-        eval_results = read_saved_results()
+        eval_results = read_saved_results(args.loader, results_dir)
     else:
         metrics = clf_clr_metrics + ['local_'+metric for metric in knn_metrics] + ['global_'+metric for metric in knn_metrics]
-        eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list), 10), dtype=np.float32), columns=metrics,
-                                    index=pd.MultiIndex.from_product([model_list,dataset_list], names=['model','dataset']))
-        eval_results.to_csv(results_dir)
+        if args.loader == 'UEA':
+            eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list), len(metrics)), dtype=np.float32), columns=metrics,
+                                        index=pd.MultiIndex.from_product([model_list,dataset_list], names=['model','dataset']))
+        elif args.loader == 'UEA_additional':
+            eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list)*len(random_seeds), len(metrics)), dtype=np.float32), columns=metrics,
+                                        index=pd.MultiIndex.from_product([model_list,dataset_list,random_seeds], names=['model','dataset','rseed']))
+    eval_results = eval_results.sort_index()
+    eval_results.to_csv(results_dir)
 
     # Evaluate for each dataset
     for dataset in dataset_list:
@@ -104,7 +126,7 @@ def main(args):
         train_data, train_labels, test_data, test_labels = loaded_data
         
         # Load tuned hyperparameters
-        tuned_params_dir = f'results/hyper_parameters/{args.loader}/{dataset}_tuned_hyperparameters.csv'
+        tuned_params_dir = f'results/hyper_parameters/UEA/{dataset}_tuned_hyperparameters.csv'
         if os.path.exists(tuned_params_dir):
             tuned_params = pd.read_csv(tuned_params_dir, index_col=0)
         else:
@@ -113,68 +135,90 @@ def main(args):
 
         feature_size = test_data.shape[-1]
         # Iterate over different models
-        for model_type in model_list:
-            # Skip if the model has been evaluated
-            if eval_results.loc[(model_type, dataset), 'svm_acc'] > 0:
-                print(f'--- {model_type} {dataset} has been evaluated, skipping ---')
-                continue
+        for rseed in random_seeds:
+            fix_seed(rseed, deterministic=args.reproduction)
+            print(f'--- Classification with random seed {rseed} ---')
+            for model_type in model_list:
+                # Skip if the model has been evaluated
+                multi_index = (model_type, dataset) if args.loader == 'UEA' else (model_type, dataset, rseed)
+                if eval_results.loc[multi_index, 'svm_acc'] > 0:
+                    print(f'--- {model_type} {dataset} has been evaluated, skipping ---')
+                    continue
 
-            model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
-            os.makedirs(model_dir, exist_ok=True)
+                if args.loader == 'UEA_additional':
+                    model_dir = os.path.join(run_dir, f'{model_type}/seed_{rseed}/{dataset}')
+                else:
+                    model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
+                os.makedirs(model_dir, exist_ok=True)
 
-            # Set hyperparameters and configure model
-            args = load_tuned_hyperparameters(args, tuned_params, model_type)
-            model_config = configure_model(args, feature_size, device)
+                # Set hyperparameters and configure model
+                if 'baseline' in model_type:
+                    args.baseline = True
+                    para2load = model_type.split('-base')[0]
+                else:
+                    args.baseline = False
+                    para2load = model_type
+                try:
+                    args = load_tuned_hyperparameters(args, tuned_params, para2load)
+                except:
+                    print(f'****** {model_type} hyperparameters not found ******')
+                    continue
+                model_config = configure_model(args, feature_size, device)
 
-            # Load the best model for evaluation
-            if os.path.exists(f'{model_dir}/loss_log.csv'):
-                print(f'--- {model_type} {dataset} has been trained, loading final model ---')
+                # Load the best model for evaluation
+                loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
                 existing_models = glob.glob(f'{model_dir}/*_net.pth')
-                best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
-            else:
-                print(f'--- {model_type} {dataset} was not trained, skipping ---')
-                continue
-            model = spclt(args.loader, **model_config)
-            model.load(f'{model_dir}/{best_model}')
+                trained_model_exist = len(existing_models) > 0
+                if loss_log_exist or trained_model_exist:
+                    print(f'--- {model_type} {dataset} has been trained, loading final model ---')
+                    existing_models = glob.glob(f'{model_dir}/*_net.pth')
+                    best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
+                else:
+                    print(f'--- {model_type} {dataset} was not trained, skipping ---')
+                    continue
+                model = spclt('UEA', **model_config)
+                model.load(f'{model_dir}/{best_model}')
 
-            # Evaluate the model
-            print(f'Evaluating with {best_model} ...')
+                # Evaluate the model
+                print(f'Evaluating with {best_model} ...')
 
-            ## classification results
-            _, acc = eval_classification(model, train_data, train_labels, test_data, test_labels)
-            clf_clr_results = {'svm_acc': acc['acc'], 'svm_auprc': acc['auprc']}
-            
-            ## knn results
-            eval_args = {'loader': args.loader, 
-                         'dataset': dataset,
-                         'data': test_data,
-                         'labels': test_labels,
-                         'model': model,
-                         'batch_size': 128,
-                         'save_dir': model_dir}
-            local_dist_results = evaluate(local=True, save_latents=False, **eval_args)
-            global_dist_results = evaluate(local=False, save_latents=True, **eval_args)
+                ## classification results
+                _, acc = eval_classification(model, train_data, train_labels, test_data, test_labels)
+                clf_clr_results = {'svm_acc': acc['acc'], 'svm_auprc': acc['auprc']}
+                
+                ## knn results
+                eval_args = {'loader': 'UEA', 
+                            'dataset': dataset,
+                            'data': test_data,
+                            'labels': test_labels,
+                            'model': model,
+                            'batch_size': 128,
+                            'save_dir': model_dir}
+                local_dist_results = evaluate(local=True, save_latents=False, **eval_args)
+                global_dist_results = evaluate(local=False, save_latents=True, **eval_args)
 
-            ## loss results
-            test_data, test_labels = datautils.modify_train_data(test_data, test_labels)
-            test_sim_mat = datautils.get_sim_mat(args.loader, test_data, dataset, args.dist_metric, prefix='test')
-            test_soft_assignments = datautils.assign_soft_labels(test_sim_mat, args.tau_inst)
-            loss_results = model.compute_loss(test_data, test_soft_assignments, non_regularized=False)
-            loss_results = {'scl_loss': loss_results[1],
-                            'sp_loss': loss_results[3] if args.regularizer is not None else np.nan}
+                ## loss results
+                test_data, test_labels = datautils.modify_train_data(test_data, test_labels)
+                test_sim_mat = datautils.get_sim_mat('UEA', test_data, dataset, args.dist_metric, prefix='test')
+                test_soft_assignments = datautils.assign_soft_labels(test_sim_mat, args.tau_inst)
+                loss_results = model.compute_loss(test_data, test_soft_assignments, non_regularized=False)
+                loss_results = {'scl_loss': loss_results[1],
+                                'sp_loss': loss_results[3] if args.regularizer is not None else np.nan}
 
-            # Save evaluation results
-            key_values = {**clf_clr_results, **loss_results, **local_dist_results, **global_dist_results}
-            keys = list(key_values.keys())
-            values = np.array(list(key_values.values())).astype(np.float32)
-            eval_results = read_saved_results() # read saved results again to avoid overwriting
-            eval_results.loc[(model_type, dataset), keys] = values
-            eval_results.loc[(model_type, dataset), 'inference_time'] = acc['inference_time']
-            eval_results.loc[(model_type, dataset), 'num_samples'] = acc['num_samples']
+                # Save evaluation results
+                key_values = {**clf_clr_results, **loss_results, **local_dist_results, **global_dist_results}
+                keys = list(key_values.keys())
+                values = np.array(list(key_values.values())).astype(np.float32)
+                eval_results = read_saved_results(args.loader, results_dir) # read saved results again to avoid overwriting
+                eval_results.loc[multi_index, keys] = values
+                eval_results.loc[multi_index, 'inference_time'] = acc['inference_time']
+                eval_results.loc[multi_index, 'num_samples'] = acc['num_samples']
 
-            # Save evaluation results per dataset and model
-            eval_results.to_csv(results_dir)
+                # Save evaluation results per dataset and model
+                eval_results.to_csv(results_dir)
 
+    eval_results['num_samples'] = eval_results['num_samples'].astype(int)
+    eval_results.to_csv(results_dir)
     print('--- Total time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - initial_time)) + ' ---')
     sys.exit(0)
 

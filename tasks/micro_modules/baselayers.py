@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from micro_modules.utils_micro import *
+from tasks.micro_modules.utils_micro import *
 import math
 
 # @GuopengLI, 16:11:15 9th Feb. 2022 (auto)

@@ -34,6 +34,7 @@ def parse_args():
     args.tau_temp = 0
     args.temporal_hierarchy = None
     args.regularizer = None
+    args.baseline = False
     args.bandwidth = 1.
     args.iters = None
     args.epochs = 100
@@ -65,15 +66,20 @@ def main(args):
 
     # Create the directory to save the evaluation results
     run_dir = f'results/pretrain/{args.loader}/'
-    results_dir = f'results/evaluation/{args.loader}_training_efficiency.csv'
     os.makedirs(run_dir, exist_ok=True)
-    os.makedirs('results/evaluation', exist_ok=True)
+    if args.loader != 'UEA_additional':
+        results_dir = f'results/evaluation/{args.loader}_training_efficiency.csv'
+        os.makedirs('results/evaluation', exist_ok=True)
 
     # Read the dataset list
-    if args.loader == 'UEA':
-        dataset_dir = os.path.join('datasets/', args.loader)
-        dataset_list = [entry.name for entry in os.scandir(dataset_dir) if entry.is_dir()]
+    if 'UEA' in args.loader:
+        dataset_list = [entry.name for entry in os.scandir('datasets/UEA') if entry.is_dir()]
         dataset_list.sort()
+        if args.loader == 'UEA_additional':
+            large_datasets = ['ArticularyWordRecognition', 'CharacterTrajectories', 'Cricket', 'EigenWorms', 'LSST', 'PEMS-SF', # spatial time series
+                              'EthanolConcentration', 'FaceDetection', 'FingerMovements', 'Heartbeat', 'MotorImagery', # non-spatial time series
+                              'PhonemeSpectra', 'SelfRegulationSCP1', 'SelfRegulationSCP2', 'SpokenArabicDigits'] # in total 15 datasets are left out
+            dataset_list = [dataset for dataset in dataset_list if dataset not in large_datasets] # in total 13 datasets are used for additional experiments
     elif 'Macro' in args.loader:
         dataset_list = [['2019']]
     elif args.loader == 'MicroTraffic':
@@ -82,7 +88,11 @@ def main(args):
         raise ValueError(f"Unknown dataset loader: {args.loader}")
 
     # Initialize evaluation dataframe for training efficiency
-    model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
+    if args.loader == 'UEA_additional':
+        model_list = ['ts2vec', 'topo-ts2vec', 'topo-ts2vec-baseline', 'ggeo-ts2vec', 'ggeo-ts2vec-baseline', 
+                      'softclt', 'topo-softclt', 'topo-softclt-baseline', 'ggeo-softclt', 'ggeo-softclt-baseline']
+    else:
+        model_list = ['ts2vec', 'topo-ts2vec', 'ggeo-ts2vec', 'softclt', 'topo-softclt', 'ggeo-softclt']
 
     def read_saved_results():
         eval_results = pd.read_csv(results_dir)
@@ -90,13 +100,14 @@ def main(args):
         eval_results = eval_results.set_index(['model', 'dataset'])
         return eval_results
     
-    if os.path.exists(results_dir):
-        eval_results = read_saved_results()
-    else:
-        metrics = ['training_time', 'training_epochs', 'training_time_per_epoch']
-        eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list), 3), dtype=np.float32), columns=metrics,
-                                    index=pd.MultiIndex.from_product([model_list, dataset_list if args.loader=='UEA' else dataset_list[0]], names=['model','dataset']))
-        eval_results.to_csv(results_dir)
+    if args.loader != 'UEA_additional':
+        if os.path.exists(results_dir):
+            eval_results = read_saved_results()
+        else:
+            metrics = ['training_time', 'training_epochs', 'training_time_per_epoch']
+            eval_results = pd.DataFrame(np.zeros((len(dataset_list)*len(model_list), 3), dtype=np.float32), columns=metrics,
+                                        index=pd.MultiIndex.from_product([model_list, dataset_list if args.loader=='UEA' else dataset_list[0]], names=['model','dataset']))
+            eval_results.to_csv(results_dir)
 
     # Train for each dataset
     bad_datasets = ['DuckDuckGeese',
@@ -105,7 +116,7 @@ def main(args):
                     'PEMS-SF'] # Datasets that are too resource-consuming to compute DTW or TAM
     for dataset in dataset_list:
         # Load dataset
-        if args.loader == 'UEA':
+        if 'UEA' in args.loader:
             loaded_data = datautils.load_UEA(dataset)
             train_data, _, _, _ = loaded_data
         elif 'Macro' in args.loader:
@@ -118,7 +129,10 @@ def main(args):
             dataset = 'train'+''.join(dataset).replace('train', '')
         
         # Load tuned hyperparameters
-        tuned_params_dir = f'results/hyper_parameters/{args.loader}/{dataset}_tuned_hyperparameters.csv'
+        if args.loader == 'UEA_additional':
+            tuned_params_dir = f'results/hyper_parameters/UEA/{dataset}_tuned_hyperparameters.csv'
+        else:
+            tuned_params_dir = f'results/hyper_parameters/{args.loader}/{dataset}_tuned_hyperparameters.csv'
         if os.path.exists(tuned_params_dir):
             tuned_params = pd.read_csv(tuned_params_dir, index_col=0)
         else:
@@ -126,7 +140,7 @@ def main(args):
             continue
 
         # Compute similarity matrix
-        if args.loader == 'UEA':
+        if 'UEA' in args.loader:
             if dataset in bad_datasets:
                 print(f"Dataset {dataset} is too resource-consuming to compute DTW or TAM, switch to EUC by default.")
                 args.dist_metric = 'EUC'
@@ -134,12 +148,12 @@ def main(args):
                 args.dist_metric = 'DTW'
         else:
             args.dist_metric = 'EUC'
-        sim_mat = datautils.get_sim_mat(args.loader, train_data, dataset, args.dist_metric)
-        
+        sim_mat = datautils.get_sim_mat('UEA' if 'UEA' in args.loader else args.loader, train_data, dataset, args.dist_metric)
+
         # Set training epochs and verbose
         train_size = train_data.shape[0]
         feature_size = train_data.shape[-1]
-        if args.loader != 'UEA':
+        if 'UEA' not in args.loader:
             args.epochs = 300
             verbose = 2
         else:
@@ -152,72 +166,96 @@ def main(args):
             verbose = 1
 
         # Iterate over different losses
-        for model_type in model_list:
-            if args.loader == 'UEA':
-                if eval_results.loc[(model_type, dataset), 'training_time'] > 0:
-                    final_epoch = eval_results.loc[(model_type, dataset), 'model_used'].split('epo')[0].split('_')[-1]
-                    if final_epoch[-2:] != '00':
-                        print(f'--- {model_type} {dataset} has been evaluated (not 00), skipping evaluation ---')
-                        continue
-                    elif int(final_epoch) == args.epochs:
-                        print(f'--- {model_type} {dataset} has been trained (==epochs), skipping evaluation ---')
-                        continue
-            # Set hyperparameters and configure model
-            try:
-                args = load_tuned_hyperparameters(args, tuned_params, model_type)
-            except:
-                print(f'****** {model_type} hyperparameters not found ******')
-                continue
-            model_config = configure_model(args, feature_size, device)
+        if args.loader == 'UEA_additional':
+            random_seeds = np.random.RandomState(args.seed).randint(100, 999, size=10)
+            print(f'---- Random seed list: {random_seeds} ----')
+        else:
+            random_seeds = [args.seed]
+        for rseed in random_seeds:
+            for model_type in model_list:
+                if args.loader == 'UEA_additional':
+                    # For complete reproducibility across multiple runs of the script,
+                    # repeatedly fix the random seed for each model and dataset
+                    fix_seed(rseed, deterministic=args.reproduction)
+                    print(f'--- Training under random seed {rseed} ---')
+                # Set hyperparameters and configure model
+                if 'baseline' in model_type:
+                    args.baseline = True
+                    para2load = model_type.split('-base')[0]
+                else:
+                    args.baseline = False
+                    para2load = model_type
+                try:
+                    args = load_tuned_hyperparameters(args, tuned_params, para2load)
+                except:
+                    print(f'****** {model_type} hyperparameters not found ******')
+                    continue
+                model_config = configure_model(args, feature_size, device)
 
-            model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
-            os.makedirs(model_dir, exist_ok=True)
+                if args.loader == 'UEA_additional':
+                    model_dir = os.path.join(run_dir, f'{model_type}/seed_{rseed}/{dataset}')
+                else:
+                    model_dir = os.path.join(run_dir, f'{model_type}/{dataset}')
+                os.makedirs(model_dir, exist_ok=True)
 
-            # Train model if not already trained or if training time is not recorded
-            loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
-            if loss_log_exist:
-                eval_results = read_saved_results()
-                training_time = eval_results.loc[(model_type, dataset), 'training_time']
-                training_epochs = eval_results.loc[(model_type, dataset), 'training_epochs']
-            if loss_log_exist and (training_time > 0):
-                print(f'--- {model_type} {dataset} has been trained, skip training ---')
-            else:
-                # Create model
-                model_config['after_epoch_callback'] = save_checkpoint_callback(model_dir, 0, unit='epoch')
-                model = spclt(args.loader, **model_config)
+                # Train model if not already trained or if training time is not recorded
+                loss_log_exist =  os.path.exists(f'{model_dir}/loss_log.csv')
+                existing_models = glob.glob(f'{model_dir}/*_net.pth')
+                trained_model_exist = len(existing_models) > 0
+                if loss_log_exist or trained_model_exist:
+                    to_train = False
+                    if args.loader != 'UEA_additional':
+                        eval_results = read_saved_results()
+                        training_time = eval_results.loc[(model_type, dataset), 'training_time']
+                        training_epochs = eval_results.loc[(model_type, dataset), 'training_epochs']
+                        if training_time > 0:
+                            print(f'--- {model_type} {dataset} has been trained, skip training ---')
+                        else:
+                            to_train = True
+                    else:
+                        print(f'--- {model_type} {dataset} has been trained, skip training ---')
+                else:
+                    to_train = True
 
-                scheduler = 'reduced'
-                print(f'--- {args.loader}_{model_type}_{dataset} training with ReduceLROnPlateau scheduler ---')
-                soft_assignments = datautils.assign_soft_labels(sim_mat, args.tau_inst)
-                start_time = systime.time()
-                loss_log = model.fit(dataset, train_data, soft_assignments, args.epochs, args.iters, scheduler, verbose=verbose)
-                training_time = systime.time() - start_time
-                training_epochs = model.epoch_n
+                if to_train:
+                    # Create model
+                    model_config['after_epoch_callback'] = save_checkpoint_callback(model_dir, 0, unit='epoch')
+                    model = spclt('UEA' if 'UEA' in args.loader else args.loader, **model_config)
 
-                # Save loss log
-                save_loss_log(loss_log, model_dir, regularizer=args.regularizer)
-                print(f'Training time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(training_time)))
-            
-            # Reserve the latest model and remove the rest
-            existing_models = glob.glob(f'{model_dir}/*_net.pth')
-            if len(existing_models)>1:
-                existing_models.sort(key=os.path.getmtime, reverse=True)
-                for model_epoch in existing_models[1:]:
-                    os.remove(model_epoch)
-                    if model_type in ['topo-ts2vec', 'ggeo-ts2vec', 'topo-softclt', 'ggeo-softclt']:
-                        os.remove(model_epoch.replace('_net.pth', '_loss_log_vars.npy'))
-            best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
+                    scheduler = 'reduced'
+                    print(f'--- {args.loader}_{model_type}_{dataset} training with ReduceLROnPlateau scheduler ---')
+                    soft_assignments = datautils.assign_soft_labels(sim_mat, args.tau_inst)
+                    start_time = systime.time()
+                    loss_log = model.fit(dataset, train_data, soft_assignments, args.epochs, args.iters, scheduler, verbose=verbose)
+                    training_time = systime.time() - start_time
+                    training_epochs = model.epoch_n
 
-            # Save evaluation results per dataset and model
-            eval_results = read_saved_results()
-            print(f'Best model {best_model} will be evaluated in downstream tasks on {dataset}')
-            
-            eval_results.loc[(model_type, dataset), 'training_time'] = training_time
-            eval_results.loc[(model_type, dataset), 'training_epochs'] = training_epochs
-            eval_results.loc[(model_type, dataset), 'training_time_per_epoch'] = training_time/training_epochs
-            eval_results.loc[(model_type, dataset), 'model_used'] = best_model
+                    # Save loss log
+                    if args.loader != 'UEA_additional':
+                        save_loss_log(loss_log, model_dir, regularizer=args.regularizer)
+                    print(f'Training time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(training_time)))
+                
+                # Reserve the latest model and remove the rest
+                existing_models = glob.glob(f'{model_dir}/*_net.pth')
+                if len(existing_models)>1:
+                    existing_models.sort(key=os.path.getmtime, reverse=True)
+                    for model_epoch in existing_models[1:]:
+                        os.remove(model_epoch)
+                        if model_type in ['topo-ts2vec', 'ggeo-ts2vec', 'topo-softclt', 'ggeo-softclt']:
+                            os.remove(model_epoch.replace('_net.pth', '_loss_log_vars.npy'))
+                best_model = 'model' + existing_models[0].split('model')[-1].split('_net')[0]
 
-            eval_results.to_csv(results_dir)
+                # Save evaluation results per dataset and model
+                if args.loader != 'UEA_additional':
+                    eval_results = read_saved_results()
+                    print(f'Best model {best_model} will be evaluated in downstream tasks on {dataset}')
+                    
+                    eval_results.loc[(model_type, dataset), 'training_time'] = training_time
+                    eval_results.loc[(model_type, dataset), 'training_epochs'] = training_epochs
+                    eval_results.loc[(model_type, dataset), 'training_time_per_epoch'] = training_time/training_epochs
+                    eval_results.loc[(model_type, dataset), 'model_used'] = best_model
+
+                    eval_results.to_csv(results_dir)
 
     print('--- Total time elapsed: ' + systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - initial_time)) + ' ---')
     sys.exit(0)
