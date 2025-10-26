@@ -5,7 +5,7 @@ datasets/**/*.md
 !**/*.py
 datasets/**/*.py
 !datasets/*.csv
-!figures/*.*
+!figures/*.ipynb
 test.ipynb
 !readme.md
 !requirements.txt
