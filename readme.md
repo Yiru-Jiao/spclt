@@ -1,8 +1,6 @@
 # Structure-preserving contrastive learning for spatial time series
 
-This study was first submitted to ICLR 2025 and got rejected. Its record on OpenReview is at https://openreview.net/forum?id=sz7HdeVVHo 
-
-After revision based on the advices from ICLR reviewers and extension for more scientific insights, we are submitting a new paper (preprinted at [arXiv](https://arxiv.org/abs/2502.06380)) to a journal. This code repository is provided for repeating the experiments and reusing the proposed methods.
+This study was first submitted to ICLR 2025 and got rejected. Its record on OpenReview is at https://openreview.net/forum?id=sz7HdeVVHo. After revision based on the advices from ICLR reviewers and extension for more scientific insights, we submitted a new paper to [Artificial Intelligence for Transportation](https://www.sciencedirect.com/journal/artificial-intelligence-for-transportation) and it got published. The paper is open-accessible at https://doi.org/10.1016/j.ait.2025.100031 and [arXiv](https://arxiv.org/abs/2502.06380). This code repository is provided for repeating the experiments and reusing the proposed methods.
 
 ## Highlights
 - Regularisers at two scales are introduced for contrastive learning of spatial time series.
@@ -48,8 +46,11 @@ To analyse and visualise the results, use `./figures/visual.ipynb`. The notebook
     title = {Structure-preserving contrastive learning for spatial time series},
     author = {Yiru Jiao and Sander {van Cranenburgh} and Simeon C. Calvert and Hans {van Lint}},
     year = {2025},
-    journal = {arXiv preprint},
-    pages = {arXiv:2502.06380}
+    journal = {Artificial Intelligence for Transportation},
+    volume = {3-4},
+    pages = {100031}
+    issn = {3050-8606},
+    doi = {10.1016/j.ait.2025.100031},
 }
 ```
 
