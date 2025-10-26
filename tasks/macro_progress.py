@@ -245,6 +245,28 @@ def main(args):
             # Save evaluation results per dataset and model
             eval_results.to_csv(results_dir)
 
+        # Save latent representations
+        model.load_state_dict(torch.load(progress_list[0], map_location=device, weights_only=True))
+        model = model.to(device)
+        model.eval()
+        latents = model.encode(testset.X[:, :20, :, :], batch_size=128).detach().cpu().numpy() # (N, S, P)
+
+        X = testset.X[:,-15:,:,0]*130 # (N, 15, 193)
+        mean_speed = X.mean(axis=(1,2)) # (N,)
+        std_speed = X.std(axis=(1,2))
+        # select samples with high dynamics, nither completely congested nor free flow
+        latents = latents[std_speed > np.percentile(std_speed, 90)]
+        mean_speed = mean_speed[std_speed > np.percentile(std_speed, 90)]
+        # exclude samples with too low or too high flow speed
+        latents = latents[(mean_speed > np.percentile(mean_speed, 25)) & 
+                          (mean_speed < np.percentile(mean_speed, 75))]
+
+        np.savez(
+            os.path.join(save_dir, f'latent_{model_type}.npz'),
+            latents=latents
+        )
+        print(f"Latent representations under {model_type} are saved.")
+
     print(f"Total time: {systime.strftime('%H:%M:%S', systime.gmtime(systime.time() - initial_time))}")
     sys.exit(0)
 
